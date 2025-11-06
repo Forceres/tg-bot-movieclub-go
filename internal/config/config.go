@@ -1,25 +1,34 @@
 package config
 
 import (
-	"errors"
 	"os"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
-// Config holds the application configuration
 type Config struct {
-	TelegramToken string
-	// Add more configuration fields as needed
+	Telegram TelegramConfig
+	Database DatabaseConfig
+	App      AppConfig
+	Kinopoisk KinopoiskConfig
 }
 
-// Load loads the configuration from environment variables
-func Load() (*Config, error) {
-	token := os.Getenv("TELEGRAM_TOKEN")
-	if token == "" {
-		return nil, errors.New("TELEGRAM_TOKEN environment variable is required")
-	}
+func LoadConfig() (*Config, error) {
+	var cfg Config
 
-	cfg := &Config{
-		TelegramToken: token,
+	nodeEnv := os.Getenv("NODE_ENV")
+
+	if nodeEnv == "production" {
+		err := cleanenv.ReadEnv(&cfg)
+		if err != nil {	
+			return nil, err
+		}
+		return &cfg, nil
 	}
-	return cfg, nil
+	
+	err := cleanenv.ReadConfig(".env", &cfg)
+	if err != nil {	
+		return nil, err
+	}
+	return &cfg, nil
 }

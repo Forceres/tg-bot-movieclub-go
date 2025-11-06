@@ -30,4 +30,6 @@ check: fmt vet test
 # Install dependencies
 deps:
 	go mod download
+
+tidy:
 	go mod tidy
