@@ -1,0 +1,45 @@
+package telegram
+
+import (
+	"context"
+	"log"
+
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
+)
+
+const message = `
+*Приветствую вас\!*  
+Это справка о командах бота\.
+
+_Добавить фильм в предложку можно с помощью отправки сообщения такого вида:_  
+*\#предлагаю* https://www\.kinopoisk\.ru/film/здесь\-указан\-id\-фильма/
+
+Если хотите предложить несколько фильмов,  
+тогда располагайте ссылки через запятую или пробелы\!
+
+В случае, если была передана ссылка на фильм,  
+который уже был просмотрен ранее, тогда он будет внесен в предложку,  
+то есть, его дата предложения изменится на текущую\!
+
+*Список возможных команд:*  
+/now \- вывести список фильмов текущего сеанса  
+/cd \- перенести дату обсуждения фильма  
+/help \- вывести справку о командах  
+/custom \- добавить свое произвольное описание к фильмам  
+/cancel\_voting \- отменить голосование  
+/cancel \- _РАБОТАЕТ ТОЛЬКО ВО ВРЕМЯ СОЗДАНИЯ ГОЛОСОВАНИЯ_  
+/already \- получить ссылки со списком просмотренных фильмов  
+/vote \- создать голосование \(только админ\)  
+/adds \- добавить фильм без голосования \(только админ\)`
+
+	func HelpHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   message,
+		ParseMode: models.ParseModeMarkdown,
+	})
+	if err != nil {
+		log.Fatalf("Error sending help message: %v", err)
+	}
+}

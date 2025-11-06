@@ -1,0 +1,5 @@
+package config
+
+type RedisConfig struct {
+	URL      string `env:"REDIS_URL" envDefault:"127.0.0.1:6379"`
+}

@@ -1,5 +1,5 @@
 package app
 
-func loadApp() {
+func loadAppContext() {
 	// Implementation goes here
 }

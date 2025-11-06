@@ -11,6 +11,7 @@ type Config struct {
 	Database DatabaseConfig
 	App      AppConfig
 	Kinopoisk KinopoiskConfig
+	Redis    RedisConfig
 }
 
 func LoadConfig() (*Config, error) {

@@ -9,8 +9,13 @@ import (
 	"os/signal"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
+	permission "github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram"
 	"github.com/go-telegram/bot"
+	"github.com/hibiken/asynq"
 )
 
 func main() {
@@ -22,13 +27,29 @@ func main() {
 	}
 	log.Printf("Loaded Telegram Bot Token: %s", cfg.Telegram.BotToken)
 
+	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
+	defer client.Close()
+
+	// Initialize database
+	db, err := db.NewSqliteDB(cfg.Database)
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+		panic(err)
+	}
+
+	println(db)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
 	nodeEnv := os.Getenv("NODE_ENV")
 
+	movieRepo := repository.NewMovieRepository(db)
+	movieService := service.NewMovieService(movieRepo)
+
+	currentMoviesHandler := telegram.NewCurrentMoviesHandler(movieService)
+
 	if nodeEnv == "production" {
-
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer cancel()
-
 		opts := []bot.Option{
 			bot.WithDefaultHandler(telegram.DefaultHandler),
 			bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken),
@@ -47,13 +68,18 @@ func main() {
 			panic(err)
 		}
 	} else {
-		b, err := bot.New(cfg.Telegram.BotToken, bot.WithDefaultHandler(telegram.DefaultHandler))
+		opts := []bot.Option{
+			bot.WithDefaultHandler(telegram.DefaultHandler),
+		}
+		b, err := bot.New(cfg.Telegram.BotToken, opts...)
 		if err != nil {
 			log.Fatalf("Failed to create bot: %v", err)
 			panic(err)
 		}
 
-		b.Start(context.TODO())
+		b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, permission.AdminOnly(cfg.Telegram.GroupID, telegram.HelpHandler))
+		b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, permission.AdminOnly(cfg.Telegram.GroupID, currentMoviesHandler.Handle))
+		b.Start(ctx)
 	}
 }
 
