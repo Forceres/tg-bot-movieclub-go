@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 )
 
@@ -12,8 +13,13 @@ type Config struct {
 
 // Load loads the configuration from environment variables
 func Load() (*Config, error) {
+	token := os.Getenv("TELEGRAM_TOKEN")
+	if token == "" {
+		return nil, errors.New("TELEGRAM_TOKEN environment variable is required")
+	}
+	
 	cfg := &Config{
-		TelegramToken: os.Getenv("TELEGRAM_TOKEN"),
+		TelegramToken: token,
 	}
 	return cfg, nil
 }
