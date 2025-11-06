@@ -36,3 +36,5 @@ go.work
 # OS files
 .DS_Store
 Thumbs.db
+db.sqlite3
+db123.sqlite3
