@@ -17,7 +17,7 @@ func Load() (*Config, error) {
 	if token == "" {
 		return nil, errors.New("TELEGRAM_TOKEN environment variable is required")
 	}
-	
+
 	cfg := &Config{
 		TelegramToken: token,
 	}
