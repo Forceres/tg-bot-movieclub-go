@@ -6,6 +6,7 @@ import (
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
+	"github.com/go-telegram/bot"
 )
 
 const MOVIE_FORMAT = `
@@ -20,9 +21,24 @@ const MOVIE_FORMAT = `
 <i>Ссылка на кинопоиск: %s.</i>
 `
 
+const ALREADY_WATCHED_MOVIES_FORMAT = `<p><b>#%d: %s (%d)</b>
+<b>Режиссер: %s <br>Страны выпуска: %s</b>
+<b>Жанры: %s</b>
+<b>Длительность в минутах: %d</b>
+<b>Рейтинг IMDb: %f</b>
+<b>Рейтинг КиноКласса: %s</b>
+<i>Дата просмотра: %s</i>
+<i>Предложен: %s</i>
+<a href=%s><i>Ссылка</i></a>
+</p>`
+
+const ALREADY_WATCHED_MOVIES_PAGE_SIZE = 50
+
 type IMovieService interface {
 	GetCurrentMovies() (*string, error)
-	GetAlreadyWatchedMovies() ([]model.Movie, error)
+	GetAlreadyWatchedMovies() ([]string, error)
+	GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error)
+	generateHTMLForWatchedMovies(movies []model.Movie) []string
 }
 
 type MovieService struct {
@@ -50,7 +66,7 @@ func (s *MovieService) GetCurrentMovies() (*string, error) {
 			movie.Genres,
 			movie.Countries,
 			movie.IMDBRating,
-			movie.Director,
+			movie.Directors,
 			movie.Year,
 			movie.Duration,
 			movie.SuggestedBy,
@@ -61,10 +77,60 @@ func (s *MovieService) GetCurrentMovies() (*string, error) {
 	return &result, nil
 }
 
-func (s *MovieService) GetAlreadyWatchedMovies() ([]model.Movie, error) {
+func (s *MovieService) GetAlreadyWatchedMovies() ([]string, error) {
 	movies, err := s.repo.GetAlreadyWatchedMovies()
 	if err != nil {
 		return nil, err
 	}
-	return movies, nil
+	result := s.generateHTMLForWatchedMovies(movies)
+	return result, nil
+}
+
+func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error) {
+	var movies []model.Movie
+	var err error
+
+	if suggested {
+		movies, err = s.repo.GetSuggestedMovies()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		movies, err = s.repo.GetAlreadyWatchedMovies()
+		if err != nil {
+			return nil, err
+		}
+	}
+	list := make([][]string, len(movies))
+	for i, movie := range movies {
+		movieString := fmt.Sprintf(`%d. %s (%d)`, movie.ID, movie.Title, movie.Year)
+		if movie.SuggestedBy != "" {
+			movieString += fmt.Sprintf(" - предложил: %s", movie.SuggestedBy)
+		}
+		list[i] = []string{fmt.Sprint(movie.ID), bot.EscapeMarkdown(movieString)}
+	}
+	return list, nil
+}
+
+func (s *MovieService) generateHTMLForWatchedMovies(movies []model.Movie) []string {
+	var pages []string
+	var html strings.Builder
+	
+	for i, movie := range movies {
+			var rating string = "N/A"
+			if movie.Rating != 0 {
+				rating = fmt.Sprintf("%.1f", movie.Rating)
+			}
+			var suggestedBy string = "Неизвестно"
+			if movie.SuggestedBy != "" {
+				suggestedBy = movie.SuggestedBy
+			}
+			html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, movie.StartedAt, suggestedBy, movie.Link))
+
+			if (i+1)%ALREADY_WATCHED_MOVIES_PAGE_SIZE == 0 || i == len(movies)-1 {
+				pages = append(pages, html.String())
+				html.Reset()
+			}
+	}
+	return pages
 }

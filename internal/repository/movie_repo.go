@@ -8,6 +8,7 @@ import (
 type IMovieRepo interface {
 	GetCurrentMovies() ([]model.Movie, error)
 	GetAlreadyWatchedMovies() ([]model.Movie, error)
+	GetSuggestedMovies() ([]model.Movie, error)
 }
 
 type MovieRepo struct {
@@ -35,7 +36,15 @@ func (r *MovieRepo) GetCurrentMovies() ([]model.Movie, error) {
 
 func (r *MovieRepo) GetAlreadyWatchedMovies() ([]model.Movie, error) {
 	var movies []model.Movie
-	if err := r.db.Model(&model.Movie{}).Where(r.db.Not(&model.Movie{FinishedAt: "NULL"})).Find(&movies).Error; err != nil {
+	if err := r.db.Model(&model.Movie{}).Where(r.db.Not(&model.Movie{FinishedAt: ""})).Find(&movies).Error; err != nil {
+		return nil, err
+	}
+	return movies, nil
+}
+
+func (r *MovieRepo) GetSuggestedMovies() ([]model.Movie, error) {
+	var movies []model.Movie
+	if err := r.db.Model(&model.Movie{}).Where(&model.Movie{StartedAt: ""}).Find(&movies).Error; err != nil {
 		return nil, err
 	}
 	return movies, nil

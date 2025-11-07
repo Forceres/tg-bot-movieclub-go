@@ -91,27 +91,29 @@ func CheckIfAdmin(ctx context.Context, b *bot.Bot, update *models.Update, groupI
     return false
 }
 
-// Authentication middleware decorator
-func Authentication(groupID int64, handler bot.HandlerFunc) bot.HandlerFunc {
-    return func(ctx context.Context, b *bot.Bot, update *models.Update) {
-        if !CheckIfInGroup(ctx, b, update, groupID) {
-            return
+func Authentication(groupID int64) bot.Middleware {
+    return func(next bot.HandlerFunc) bot.HandlerFunc {
+        return func(ctx context.Context, b *bot.Bot, update *models.Update) {
+            if !CheckIfInGroup(ctx, b, update, groupID) {
+                return
+            }
+            next(ctx, b, update)
         }
-        handler(ctx, b, update)
     }
 }
 
-// AdminOnly middleware decorator
-func AdminOnly(groupID int64, handler bot.HandlerFunc) bot.HandlerFunc {
-    return func(ctx context.Context, b *bot.Bot, update *models.Update) {
-        if !CheckIfInGroup(ctx, b, update, groupID) {
-            return
-        }
+func AdminOnly(groupID int64) bot.Middleware {
+    return func(next bot.HandlerFunc) bot.HandlerFunc {
+        return func(ctx context.Context, b *bot.Bot, update *models.Update) {
+            if !CheckIfInGroup(ctx, b, update, groupID) {
+                return
+            }
 
-        if !CheckIfAdmin(ctx, b, update, groupID) {
-            return
-        }
+            if !CheckIfAdmin(ctx, b, update, groupID) {
+                return
+            }
 
-        handler(ctx, b, update)
+            next(ctx, b, update)
+        }
     }
 }

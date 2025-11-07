@@ -14,8 +14,17 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
 	permission "github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegraph"
 	"github.com/go-telegram/bot"
+	"github.com/go-telegram/fsm"
 	"github.com/hibiken/asynq"
+)
+
+const (
+	stateDefault fsm.StateID = "default"
+	statePrepareVotingType  fsm.StateID = "prepare_voting_type"
+	statePrepareVotingDuration  fsm.StateID = "prepare_voting_duration"
+	statePrepareMovies  fsm.StateID = "prepare_movies"
 )
 
 func main() {
@@ -30,34 +39,49 @@ func main() {
 	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
 	defer client.Close()
 
-	// Initialize database
 	db, err := db.NewSqliteDB(cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 		panic(err)
 	}
 
-	println(db)
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	nodeEnv := os.Getenv("NODE_ENV")
 
+	telegraph, err := telegraph.InitTelegraph()
+	if err != nil {
+		log.Fatalf("Failed to initialize telegraph: %v", err)
+		panic(err)
+	}
+
+	f := fsm.New(
+		stateDefault,
+		map[fsm.StateID]fsm.Callback{},
+	)
+
 	movieRepo := repository.NewMovieRepository(db)
 	movieService := service.NewMovieService(movieRepo)
 
+	defaultHandler := telegram.NewDefaultHandler(f)
 	currentMoviesHandler := telegram.NewCurrentMoviesHandler(movieService)
+	alreadyWatchedMoviesHandler := telegram.NewAlreadyWatchedMoviesHandler(movieService, telegraph)
+	votingHandler := telegram.NewVotingHandler(movieService, f)
 
+	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
+		statePrepareVotingType: votingHandler.PrepareVotingType,
+		statePrepareVotingDuration: votingHandler.PrepareVotingDuration,
+		statePrepareMovies: votingHandler.PrepareMovies,
+	})
+	
 	if nodeEnv == "production" {
 		opts := []bot.Option{
-			bot.WithDefaultHandler(telegram.DefaultHandler),
+			bot.WithDefaultHandler(defaultHandler.Handle),
 			bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken),
 		}
 
 		b, _ := bot.New(cfg.Telegram.BotToken, opts...)
-
-		// call methods.SetWebhook if needed
 
 		go b.StartWebhook(ctx)
 
@@ -69,7 +93,8 @@ func main() {
 		}
 	} else {
 		opts := []bot.Option{
-			bot.WithDefaultHandler(telegram.DefaultHandler),
+			bot.WithDefaultHandler(defaultHandler.Handle),
+			bot.WithMiddlewares(permission.Authentication(cfg.Telegram.GroupID)),
 		}
 		b, err := bot.New(cfg.Telegram.BotToken, opts...)
 		if err != nil {
@@ -77,8 +102,11 @@ func main() {
 			panic(err)
 		}
 
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, permission.AdminOnly(cfg.Telegram.GroupID, telegram.HelpHandler))
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, permission.AdminOnly(cfg.Telegram.GroupID, currentMoviesHandler.Handle))
+
+		b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, telegram.HelpHandler, permission.AdminOnly(cfg.Telegram.GroupID))
+		b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, currentMoviesHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
+		b.RegisterHandler(bot.HandlerTypeMessageText, "/already", bot.MatchTypeExact, alreadyWatchedMoviesHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
+		b.RegisterHandler(bot.HandlerTypeMessageText, "/voting", bot.MatchTypeExact, votingHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
 		b.Start(ctx)
 	}
 }
