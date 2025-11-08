@@ -8,27 +8,17 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/kinopoisk"
 	permission "github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegraph"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/fsm"
-	"github.com/hibiken/asynq"
 )
 
-const (
-	stateDefault               fsm.StateID = "default"
-	statePrepareVotingType     fsm.StateID = "prepare_voting_type"
-	statePrepareVotingTitle    fsm.StateID = "prepare_voting_title"
-	statePrepareVotingDuration fsm.StateID = "prepare_voting_duration"
-	statePrepareMovies         fsm.StateID = "prepare_movies"
-	stateStartVoting           fsm.StateID = "start_voting"
-)
+const stateDefault fsm.StateID = "default"
+
+const PRODUCTION = "PRODUCTION"
 
 const (
 	AllowedUpdateMessage                 string = "message"
@@ -57,110 +47,65 @@ const (
 )
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
 	log.Println("Starting Telegram Movie Club Bot...")
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
-		panic(err)
 	}
-	log.Printf("Loaded Telegram Bot Token: %s", cfg.Telegram.BotToken)
-
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
-	defer client.Close()
-
-	db, err := db.NewSqliteDB(cfg.Database)
-	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
-		panic(err)
-	}
-
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
 	nodeEnv := os.Getenv("NODE_ENV")
-
-	telegraph, err := telegraph.InitTelegraph()
-	if err != nil {
-		log.Fatalf("Failed to initialize telegraph: %v", err)
-		panic(err)
-	}
-
 	f := fsm.New(
 		stateDefault,
 		map[fsm.StateID]fsm.Callback{},
 	)
-
-	movieRepo := repository.NewMovieRepository(db)
-	movieService := service.NewMovieService(movieRepo)
-
-	votingRepo := repository.NewVotingRepository(db)
-	votingService := service.NewVotingService(votingRepo)
-
-	pollRepo := repository.NewPollRepository(db)
-	pollService := service.NewPollService(pollRepo)
-
-	voteRepo := repository.NewVoteRepository(db)
-	voteService := service.NewVoteService(voteRepo)
-
-	kinopoiskClient := &http.Client{}
-	kinopoiskAPI := kinopoisk.NewKinopoiskAPI(&cfg.Kinopoisk, kinopoiskClient)
-	kinopoiskService := service.NewKinopoiskService(kinopoiskAPI)
-
 	defaultHandler := telegram.NewDefaultHandler(f)
-	currentMoviesHandler := telegram.NewCurrentMoviesHandler(movieService)
-	alreadyWatchedMoviesHandler := telegram.NewAlreadyWatchedMoviesHandler(movieService, telegraph)
-	votingHandler := telegram.NewVotingHandler(movieService, votingService, pollService, voteService, f)
-	suggestMovieHandler := telegram.NewSuggestMovieHandler(movieService, kinopoiskService)
-
-	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
-		statePrepareVotingType:     votingHandler.PrepareVotingType,
-		statePrepareVotingTitle:    votingHandler.PrepareVotingTitle,
-		statePrepareVotingDuration: votingHandler.PrepareVotingDuration,
-		statePrepareMovies:         votingHandler.PrepareMovies,
-		stateStartVoting:           votingHandler.StartVoting,
-	})
-
-	if nodeEnv == "production" {
-		opts := []bot.Option{
-			bot.WithDefaultHandler(defaultHandler.Handle),
-			bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken),
-		}
-
-		b, _ := bot.New(cfg.Telegram.BotToken, opts...)
-
-		go b.StartWebhook(ctx)
-
-		err := http.ListenAndServe(":2000", b.WebhookHandler())
-
+	opts := []bot.Option{
+		bot.WithDefaultHandler(defaultHandler.Handle),
+		bot.WithMiddlewares(permission.Authentication(cfg.Telegram.GroupID)),
+		bot.WithAllowedUpdates([]string{
+			AllowedUpdateMessage,
+			AllowedUpdateEditedMessage,
+			AllowedUpdateChannelPost,
+			AllowedUpdateEditedChannelPost,
+			AllowedUpdateCallbackQuery,
+			AllowedUpdatePoll,
+			AllowedUpdatePollAnswer,
+		}),
+	}
+	if nodeEnv == PRODUCTION {
+		err := startWebhook(ctx, opts, cfg, f)
 		if err != nil {
-			log.Fatalf("Failed to start webhook server: %v", err)
-			panic(err)
+			log.Fatalf("Failed to start webhook: %v", err)
 		}
 	} else {
-		opts := []bot.Option{
-			bot.WithDefaultHandler(defaultHandler.Handle),
-			bot.WithMiddlewares(permission.Authentication(cfg.Telegram.GroupID)),
-			// bot.WithCallbackQueryDataHandler("poll_answer", bot.MatchTypeExact, votingHandler.HandlePollAnswer),
-			bot.WithAllowedUpdates([]string{
-				AllowedUpdateMessage,
-				AllowedUpdateEditedMessage,
-				AllowedUpdateChannelPost,
-				AllowedUpdateEditedChannelPost,
-				AllowedUpdateCallbackQuery,
-				AllowedUpdatePollAnswer,
-			}),
-		}
-		b, err := bot.New(cfg.Telegram.BotToken, opts...)
+		err := startLongPolling(ctx, opts, cfg, f)
 		if err != nil {
-			log.Fatalf("Failed to create bot: %v", err)
-			panic(err)
+			log.Fatalf("Failed to start long polling: %v", err)
 		}
-
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, telegram.HelpHandler, permission.AdminOnly(cfg.Telegram.GroupID))
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, currentMoviesHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/already", bot.MatchTypeExact, alreadyWatchedMoviesHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/voting", bot.MatchTypeExact, votingHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
-		b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, suggestMovieHandler.Handle)
-		b.Start(ctx)
 	}
+}
+
+func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, f *fsm.FSM) error {
+	b, err := bot.New(cfg.Telegram.BotToken, opts...)
+	if err != nil {
+		log.Printf("Failed to create bot: %v", err)
+		return err
+	}
+	app.LoadApp(cfg, b, f)
+	b.Start(ctx)
+	return nil
+}
+
+func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, f *fsm.FSM) error {
+	opts = append(opts, bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken))
+	b, _ := bot.New(cfg.Telegram.BotToken, opts...)
+	app.LoadApp(cfg, b, f)
+	go b.StartWebhook(ctx)
+	err := http.ListenAndServe(":2000", b.WebhookHandler())
+	if err != nil {
+		log.Printf("Failed to start webhook server: %v", err)
+		return err
+	}
+	return nil
 }

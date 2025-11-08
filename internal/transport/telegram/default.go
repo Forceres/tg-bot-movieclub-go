@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
@@ -83,6 +84,56 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		h.f.Set(userID, "movieIDs", movieIDs)
 
 		h.f.Transition(userID, statePrepareVotingDuration, userID, ctx, b, update)
+	case statePrepareCancelIDs:
+		idxs := update.Message.Text
+
+		cancelIndexes := []int64{}
+		iter := strings.SplitSeq(idxs, ",")
+		for id := range iter {
+			cancelID, err := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
+			if err == nil {
+				cancelIndexes = append(cancelIndexes, cancelID)
+			}
+		}
+
+		if len(cancelIndexes) == 0 {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Введите корректные целые числа через запятую",
+			})
+			return
+		}
+
+		votings, ok := h.f.Get(userID, "votings")
+		if !ok {
+			h.f.Reset(userID)
+			return
+		}
+
+		votingIDs := []int64{}
+
+		for _, idx := range cancelIndexes {
+			for votingIdx, voting := range votings.([]*model.Voting) {
+				if int64(votingIdx+1) == idx {
+					votingIDs = append(votingIDs, voting.ID)
+				}
+			}
+		}
+		paginatorMsgID, ok := h.f.Get(userID, "paginatorMsgID")
+		if !ok {
+			h.f.Reset(userID)
+			return
+		}
+		ok, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: paginatorMsgID.(int),
+		})
+		if err != nil || !ok {
+			h.f.Reset(userID)
+			return
+		}
+		h.f.Set(userID, "votingIDs", votingIDs)
+		h.f.Transition(userID, stateCancel, userID, ctx, b, update)
 	default:
 		fmt.Printf("unexpected state %s\n", currentState)
 	}

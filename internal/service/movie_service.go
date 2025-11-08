@@ -63,7 +63,7 @@ func (s *MovieService) Create(movie *MovieDTO, suggestedBy string) error {
 		Genres:      strings.Join(movie.Genres, ", "),
 		Link:        movie.Link,
 		Duration:    movie.Duration,
-		IMDBRating:  movie.Imdb,
+		IMDBRating:  movie.IMDBRating,
 		SuggestedBy: movie.SuggestedBy,
 		SuggestedAt: time.Now().String(),
 	}

@@ -33,10 +33,10 @@ _Добавить фильм в предложку можно с помощью 
 /vote \- создать голосование \(только админ\)  
 /adds \- добавить фильм без голосования \(только админ\)`
 
-	func HelpHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   message,
+func HelpHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    update.Message.Chat.ID,
+		Text:      message,
 		ParseMode: models.ParseModeMarkdown,
 	})
 	if err != nil {

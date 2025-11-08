@@ -8,6 +8,8 @@ import (
 type IVotingService interface {
 	CreateVoting(voting *model.Voting) (*model.Voting, error)
 	FindVotingByID(id int64) (*model.Voting, error)
+	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
+	FindVotingByStatus(status string) ([]*model.Voting, error)
 }
 
 type VotingService struct {
@@ -24,4 +26,12 @@ func (s *VotingService) CreateVoting(voting *model.Voting) (*model.Voting, error
 
 func (s *VotingService) FindVotingByID(id int64) (*model.Voting, error) {
 	return s.repo.FindVotingByID(id)
+}
+
+func (s *VotingService) FindVotingByStatus(status string) ([]*model.Voting, error) {
+	return s.repo.FindVotingsByStatus(status)
+}
+
+func (s *VotingService) UpdateVotingStatus(voting *model.Voting) (*model.Voting, error) {
+	return s.repo.UpdateVotingStatus(voting)
 }

@@ -25,13 +25,13 @@ func (h *CurrentMoviesHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 	if err != nil {
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text: "Мы пока ничего не смотрим!",
+			Text:   "Мы пока ничего не смотрим!",
 		})
 		return
 	}
 	b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text: *movies,
-			ParseMode: models.ParseModeHTML,
+		ChatID:    update.Message.Chat.ID,
+		Text:      *movies,
+		ParseMode: models.ParseModeHTML,
 	})
 }

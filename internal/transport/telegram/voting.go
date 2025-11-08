@@ -405,15 +405,7 @@ func getByIndex(slice [][]string, index int64) *[]string {
 // Universal poll answer handler - register once at bot startup
 func (h *VotingHandler) HandlePollAnswer(ctx context.Context, b *bot.Bot, update *models.Update) {
 	fmt.Println("handle poll answer")
-	// b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-	// 	CallbackQueryID: update.CallbackQuery.ID,
-	// 	ShowAlert:       false,
-	// })
-	if update.PollAnswer == nil {
-		return
-	}
 
-	// Get poll data from database
 	poll, err := h.pollService.GetPollByPollID(update.PollAnswer.PollID)
 	if err != nil {
 		log.Printf("Poll not found: %s", update.PollAnswer.PollID)
@@ -425,7 +417,6 @@ func (h *VotingHandler) HandlePollAnswer(ctx context.Context, b *bot.Bot, update
 		update.PollAnswer.PollID,
 		poll.Type)
 
-	// Save votes
 	for _, optionID := range update.PollAnswer.OptionIDs {
 		vote := &model.Vote{
 			VotingID: poll.VotingID,
@@ -437,14 +428,12 @@ func (h *VotingHandler) HandlePollAnswer(ctx context.Context, b *bot.Bot, update
 			vote.Rating = &rating
 			vote.MovieID = poll.MovieID
 		} else if poll.Type == SELECTION_TYPE {
-			// Get poll options to map optionID to movieID
 			options, err := h.pollService.GetPollOptionsByPollID(poll.ID)
 			if err != nil {
 				log.Printf("Error getting poll options: %v", err)
 				continue
 			}
 
-			// Find the movie ID for this option
 			if optionID < len(options) {
 				vote.MovieID = &options[optionID].MovieID
 			} else {

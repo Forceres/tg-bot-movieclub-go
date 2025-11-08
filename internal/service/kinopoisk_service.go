@@ -15,7 +15,7 @@ type MovieDTO struct {
 	Genres      []string `json:"genres"`
 	Link        string   `json:"link"`
 	Duration    int      `json:"duration"`
-	Imdb        float64  `json:"imdb"`
+	IMDBRating  float64  `json:"imdb"`
 	SuggestedBy string   `json:"suggested_by"`
 }
 
@@ -63,7 +63,7 @@ func (s *KinopoiskService) ParseMovies(response *[]kinopoisk.KinopoiskMovieWithS
 		}
 		movieDto.Year = item.Movie.Year
 		movieDto.Duration = item.Movie.FilmLength
-		movieDto.Imdb = item.Movie.RatingImdb
+		movieDto.IMDBRating = item.Movie.RatingImdb
 		movieDto.SuggestedBy = *suggestedBy
 		moviesDto = append(moviesDto, movieDto)
 	}

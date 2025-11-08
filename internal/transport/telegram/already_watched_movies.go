@@ -16,15 +16,15 @@ import (
 
 type AlreadyWatchedMoviesHandler struct {
 	movieService service.IMovieService
-	telegraph *telegraph.Telegraph
-	chatData map[int64]*ChatData
+	telegraph    *telegraph.Telegraph
+	chatData     map[int64]*ChatData
 }
 
 type ChatData struct {
-	LastPageURL  string
-	LastPage string
-	MessageID int
-	Links []string
+	LastPageURL string
+	LastPage    string
+	MessageID   int
+	Links       []string
 }
 
 type IAlreadyWatchedMoviesHandler interface {
@@ -37,153 +37,153 @@ func NewAlreadyWatchedMoviesHandler(movieService service.IMovieService,
 }
 
 func (h *AlreadyWatchedMoviesHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
-    chatID := update.Message.Chat.ID
-    data := h.getChatData(chatID)
+	chatID := update.Message.Chat.ID
+	data := h.getChatData(chatID)
 
-    formattedMovies, err := h.movieService.GetAlreadyWatchedMovies()
-    if err != nil {
-        log.Printf("Error retrieving watched movies: %v", err)
-        b.SendMessage(ctx, &bot.SendMessageParams{
-            ChatID: chatID,
-            Text:   "Ошибка при получении списка фильмов",
-        })
-        return
-    }
+	formattedMovies, err := h.movieService.GetAlreadyWatchedMovies()
+	if err != nil {
+		log.Printf("Error retrieving watched movies: %v", err)
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "Ошибка при получении списка фильмов",
+		})
+		return
+	}
 
-    if data.LastPageURL == "" {
-        h.handleNewPages(ctx, b, update, data, formattedMovies)
-        return
-    }
+	if data.LastPageURL == "" {
+		h.handleNewPages(ctx, b, update, data, formattedMovies)
+		return
+	}
 
-    h.handleUpdatePage(ctx, b, update, data)
+	h.handleUpdatePage(ctx, b, update, data)
 }
 
 func (h *AlreadyWatchedMoviesHandler) addNewPage(ctx context.Context, b *bot.Bot, update *models.Update, data *ChatData, pages []string) {
-    newPage, err := h.telegraph.Client.CreatePage(
-        h.telegraph.Account.AccessToken,
-        "Список просмотренных фильмов",
-        pages[len(pages)-1],
-        &telegraphv2.PageOpts{
-            AuthorName: "КиноКлассБот",
-        },
-    )
-    if err != nil {
-        log.Printf("Error creating telegraph page: %v", err)
-        return
-    }
+	newPage, err := h.telegraph.Client.CreatePage(
+		h.telegraph.Account.AccessToken,
+		"Список просмотренных фильмов",
+		pages[len(pages)-1],
+		&telegraphv2.PageOpts{
+			AuthorName: "КиноКлассБот",
+		},
+	)
+	if err != nil {
+		log.Printf("Error creating telegraph page: %v", err)
+		return
+	}
 
-    links := append(data.Links, fmt.Sprintf("%d. %s", len(data.Links)+1, newPage.Url))
-    data.LastPageURL = newPage.Url
-    data.Links = links
+	links := append(data.Links, fmt.Sprintf("%d. %s", len(data.Links)+1, newPage.Url))
+	data.LastPageURL = newPage.Url
+	data.Links = links
 
-    b.EditMessageText(ctx, &bot.EditMessageTextParams{
-        ChatID: update.Message.Chat.ID,
-        Text: strings.Join(links, "\n"),
-        MessageID: data.MessageID,
-    })
+	b.EditMessageText(ctx, &bot.EditMessageTextParams{
+		ChatID:    update.Message.Chat.ID,
+		Text:      strings.Join(links, "\n"),
+		MessageID: data.MessageID,
+	})
 }
 
 func (h *AlreadyWatchedMoviesHandler) handleUpdatePage(ctx context.Context, b *bot.Bot, update *models.Update, data *ChatData) {
-    log.Println("Handle update page...")
-    urlParts := strings.Split(data.LastPageURL, "/")
-    path := urlParts[len(urlParts)-1]
+	log.Println("Handle update page...")
+	urlParts := strings.Split(data.LastPageURL, "/")
+	path := urlParts[len(urlParts)-1]
 
-    page, err := h.telegraph.Client.EditPage(h.telegraph.Account.AccessToken, path, "Список просмотренных фильмов", data.LastPage, &telegraphv2.PageOpts{
-        AuthorName: "КиноКлассБот",
-        ReturnContent: true,
-    })
-    if err != nil {
-        log.Printf("Error editing telegraph page: %v, retrying...", err)
-        data.LastPageURL = ""
-        h.Handle(ctx, b, update)
-        return
-    }
+	page, err := h.telegraph.Client.EditPage(h.telegraph.Account.AccessToken, path, "Список просмотренных фильмов", data.LastPage, &telegraphv2.PageOpts{
+		AuthorName:    "КиноКлассБот",
+		ReturnContent: true,
+	})
+	if err != nil {
+		log.Printf("Error editing telegraph page: %v, retrying...", err)
+		data.LastPageURL = ""
+		h.Handle(ctx, b, update)
+		return
+	}
 
-    links := data.Links
-    if len(links) > 0 {
-        links = links[:len(links)-1]
-    }
-    links = append(links, fmt.Sprintf("%d. %s", len(links)+1, page.Url))
-    data.Links = links
-    timestamp := time.Now().UTC().Format("01-02-2006 15:04:05")
-    linksWithTime := append(links, timestamp)
+	links := data.Links
+	if len(links) > 0 {
+		links = links[:len(links)-1]
+	}
+	links = append(links, fmt.Sprintf("%d. %s", len(links)+1, page.Url))
+	data.Links = links
+	timestamp := time.Now().UTC().Format("01-02-2006 15:04:05")
+	linksWithTime := append(links, timestamp)
 
-    b.EditMessageText(ctx, &bot.EditMessageTextParams{
-        ChatID: update.Message.Chat.ID,
-        Text: strings.Join(linksWithTime, "\n"),
-        MessageID: data.MessageID,
-    })
+	b.EditMessageText(ctx, &bot.EditMessageTextParams{
+		ChatID:    update.Message.Chat.ID,
+		Text:      strings.Join(linksWithTime, "\n"),
+		MessageID: data.MessageID,
+	})
 }
 
 func (h *AlreadyWatchedMoviesHandler) handleNewPages(ctx context.Context, b *bot.Bot, update *models.Update, data *ChatData, pages []string) {
-    log.Println("Handle new pages...")
-    if data.MessageID == 0 {
-        log.Println("Handle initial message...")
-        h.createInitialMessage(ctx, b, update, data, pages)
-        return
-    }
-    h.addNewPage(ctx, b, update, data, pages)
+	log.Println("Handle new pages...")
+	if data.MessageID == 0 {
+		log.Println("Handle initial message...")
+		h.createInitialMessage(ctx, b, update, data, pages)
+		return
+	}
+	h.addNewPage(ctx, b, update, data, pages)
 }
 
 func (h *AlreadyWatchedMoviesHandler) createInitialMessage(ctx context.Context, b *bot.Bot, update *models.Update, data *ChatData, pages []string) {
-    newPages := h.createTelegraphPages(pages)
-    if len(newPages) == 0 {
-        return
-    }
+	newPages := h.createTelegraphPages(pages)
+	if len(newPages) == 0 {
+		return
+	}
 
-    data.LastPage = pages[len(pages)-1]
-    data.LastPageURL = newPages[len(newPages)-1]
-    var links []string
-    for idx, url := range newPages {
-        links = append(links, fmt.Sprintf("%d. %s", idx+1, url))
-    }
+	data.LastPage = pages[len(pages)-1]
+	data.LastPageURL = newPages[len(newPages)-1]
+	var links []string
+	for idx, url := range newPages {
+		links = append(links, fmt.Sprintf("%d. %s", idx+1, url))
+	}
 
-    msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
-        ChatID: update.Message.Chat.ID,
-        Text:   strings.Join(links, "\n"),
-    })
-    if err != nil {
-        log.Printf("Error sending message: %v", err)
-    }
+	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   strings.Join(links, "\n"),
+	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 
-    data.MessageID = msg.ID
-    data.Links = links
+	data.MessageID = msg.ID
+	data.Links = links
 
-    b.PinChatMessage(ctx, &bot.PinChatMessageParams{
-        ChatID: update.Message.Chat.ID,
-        MessageID: data.MessageID,
-        DisableNotification: true,
-    })
+	b.PinChatMessage(ctx, &bot.PinChatMessageParams{
+		ChatID:              update.Message.Chat.ID,
+		MessageID:           data.MessageID,
+		DisableNotification: true,
+	})
 
-    b.DeleteMessage(ctx, &bot.DeleteMessageParams{
-        ChatID: update.Message.Chat.ID,
-        MessageID: data.MessageID - 1,
-    })
+	b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+		ChatID:    update.Message.Chat.ID,
+		MessageID: data.MessageID - 1,
+	})
 }
 
 func (h *AlreadyWatchedMoviesHandler) getChatData(chatID int64) *ChatData {
-    if h.chatData[chatID] == nil {
-        h.chatData[chatID] = &ChatData{}
-    }
-    return h.chatData[chatID]
+	if h.chatData[chatID] == nil {
+		h.chatData[chatID] = &ChatData{}
+	}
+	return h.chatData[chatID]
 }
 
 func (h *AlreadyWatchedMoviesHandler) createTelegraphPages(pagesData []string) []string {
-    var newPages []string
-    for i, pageData := range pagesData {
-        page, err := h.telegraph.Client.CreatePage(
-            h.telegraph.Account.AccessToken,
-            "Список просмотренных фильмов",
-            pageData,
-            &telegraphv2.PageOpts{
-                AuthorName: "КиноКлассБот",
+	var newPages []string
+	for i, pageData := range pagesData {
+		page, err := h.telegraph.Client.CreatePage(
+			h.telegraph.Account.AccessToken,
+			"Список просмотренных фильмов",
+			pageData,
+			&telegraphv2.PageOpts{
+				AuthorName: "КиноКлассБот",
 			},
-        )
-        if err != nil {
-            log.Printf("Error creating telegraph page %d: %v", i, err)
-            continue
-        }
-        newPages = append(newPages, page.Url)
-    }
-    return newPages
+		)
+		if err != nil {
+			log.Printf("Error creating telegraph page %d: %v", i, err)
+			continue
+		}
+		newPages = append(newPages, page.Url)
+	}
+	return newPages
 }
