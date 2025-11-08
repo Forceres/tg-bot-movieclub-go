@@ -7,20 +7,25 @@ import (
 )
 
 type MovieDTO struct {
-	Title			 string  `json:"title"`
-	Description	 string  `json:"description"`
-	Directors	 []string  `json:"director"`
-	Year		 int     `json:"year"`
-	Countries	 []string  `json:"countries"`
-	Genres		 []string  `json:"genres"`
-	Link		 string  `json:"link"`
-	Duration	 int     `json:"duration"`
-	Imdb		 float64 `json:"imdb"`
-	SuggestedBy	 string  `json:"suggested_by"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Directors   []string `json:"director"`
+	Year        int      `json:"year"`
+	Countries   []string `json:"countries"`
+	Genres      []string `json:"genres"`
+	Link        string   `json:"link"`
+	Duration    int      `json:"duration"`
+	Imdb        float64  `json:"imdb"`
+	SuggestedBy string   `json:"suggested_by"`
 }
 
 type KinopoiskService struct {
 	kinopoiskAPI kinopoisk.IKinopoiskAPI
+}
+
+type IKinopoiskService interface {
+	SearchMovies(ids []int, suggestedBy string) ([]MovieDTO, error)
+	ParseMovies(response *[]kinopoisk.KinopoiskMovieWithStaff, suggestedBy *string) ([]MovieDTO, error)
 }
 
 func NewKinopoiskService(kinopoiskAPI kinopoisk.IKinopoiskAPI) *KinopoiskService {
@@ -42,7 +47,7 @@ func (s *KinopoiskService) ParseMovies(response *[]kinopoisk.KinopoiskMovieWithS
 	var moviesDto []MovieDTO
 	for _, item := range *response {
 		var movieDto MovieDTO
-		movieDto.Link= fmt.Sprintf("https://www.kinopoisk.ru/film/%d/", item.Movie.KinopoiskID)
+		movieDto.Link = fmt.Sprintf("https://www.kinopoisk.ru/film/%d/", item.Movie.KinopoiskID)
 		for _, person := range *item.Staff {
 			if person.ProfessionKey == "DIRECTOR" {
 				movieDto.Directors = append(movieDto.Directors, person.NameRu)

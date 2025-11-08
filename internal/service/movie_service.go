@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
@@ -38,6 +39,8 @@ type IMovieService interface {
 	GetCurrentMovies() (*string, error)
 	GetAlreadyWatchedMovies() ([]string, error)
 	GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error)
+	GetMovieByID(id int) (*model.Movie, error)
+	Create(movie *MovieDTO, suggestedBy string) error
 	generateHTMLForWatchedMovies(movies []model.Movie) []string
 }
 
@@ -49,6 +52,32 @@ func NewMovieService(repo repository.IMovieRepo) *MovieService {
 	return &MovieService{repo: repo}
 }
 
+func (s *MovieService) Create(movie *MovieDTO, suggestedBy string) error {
+	newMovie := model.Movie{
+		ID:          0,
+		Title:       movie.Title,
+		Description: movie.Description,
+		Directors:   strings.Join(movie.Directors, ", "),
+		Year:        movie.Year,
+		Countries:   strings.Join(movie.Countries, ", "),
+		Genres:      strings.Join(movie.Genres, ", "),
+		Link:        movie.Link,
+		Duration:    movie.Duration,
+		IMDBRating:  movie.Imdb,
+		SuggestedBy: movie.SuggestedBy,
+		SuggestedAt: time.Now().String(),
+	}
+	return s.repo.Create(&newMovie)
+}
+
+func (s *MovieService) GetMovieByID(id int) (*model.Movie, error) {
+	movie, err := s.repo.GetMovieByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return movie, nil
+}
+
 func (s *MovieService) GetCurrentMovies() (*string, error) {
 	movies, err := s.repo.GetCurrentMovies()
 	if err != nil {
@@ -57,7 +86,7 @@ func (s *MovieService) GetCurrentMovies() (*string, error) {
 	if len(movies) == 0 {
 		return nil, fmt.Errorf("no current movies found")
 	}
-	formattedMovies := make([]string, len(movies) + 1)
+	formattedMovies := make([]string, len(movies)+1)
 	formattedMovies[0] = "<b>#смотрим</b>"
 	for i, movie := range movies {
 		formattedMovies[i+1] = fmt.Sprintf(MOVIE_FORMAT,
@@ -115,22 +144,22 @@ func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, 
 func (s *MovieService) generateHTMLForWatchedMovies(movies []model.Movie) []string {
 	var pages []string
 	var html strings.Builder
-	
-	for i, movie := range movies {
-			var rating string = "N/A"
-			if movie.Rating != 0 {
-				rating = fmt.Sprintf("%.1f", movie.Rating)
-			}
-			var suggestedBy string = "Неизвестно"
-			if movie.SuggestedBy != "" {
-				suggestedBy = movie.SuggestedBy
-			}
-			html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, movie.StartedAt, suggestedBy, movie.Link))
 
-			if (i+1)%ALREADY_WATCHED_MOVIES_PAGE_SIZE == 0 || i == len(movies)-1 {
-				pages = append(pages, html.String())
-				html.Reset()
-			}
+	for i, movie := range movies {
+		var rating string = "N/A"
+		if movie.Rating != 0 {
+			rating = fmt.Sprintf("%.1f", movie.Rating)
+		}
+		var suggestedBy string = "Неизвестно"
+		if movie.SuggestedBy != "" {
+			suggestedBy = movie.SuggestedBy
+		}
+		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, movie.StartedAt, suggestedBy, movie.Link))
+
+		if (i+1)%ALREADY_WATCHED_MOVIES_PAGE_SIZE == 0 || i == len(movies)-1 {
+			pages = append(pages, html.String())
+			html.Reset()
+		}
 	}
 	return pages
 }
