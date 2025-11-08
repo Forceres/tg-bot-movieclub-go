@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
+	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
@@ -23,11 +24,6 @@ func NewDefaultHandler(f *fsm.FSM) *DefaultHandler {
 }
 
 func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
-	fmt.Println("new update")
-	if update.PollAnswer != nil {
-		fmt.Println("Poll exists!")
-	}
-
 	if update.Message == nil {
 		return
 	}
@@ -44,11 +40,13 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	case statePrepareVotingType:
 		return
 	case statePrepareVotingTitle:
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		title := cases.Title(language.Russian).String(update.Message.Text)
 		h.f.Set(userID, "title", title)
 
 		h.f.Transition(userID, statePrepareMovies, userID, ctx, b, update)
 	case statePrepareVotingDuration:
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		duration, errDuration := strconv.Atoi(update.Message.Text)
 		if errDuration != nil {
 			b.SendMessage(ctx, &bot.SendMessageParams{
@@ -63,7 +61,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		h.f.Transition(userID, stateStartVoting, userID, ctx, b, update)
 	case statePrepareMovies:
 		ids := update.Message.Text
-
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		movieIDs := []int64{}
 		iter := strings.SplitSeq(ids, ",")
 		for id := range iter {
@@ -86,7 +84,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		h.f.Transition(userID, statePrepareVotingDuration, userID, ctx, b, update)
 	case statePrepareCancelIDs:
 		idxs := update.Message.Text
-
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		cancelIndexes := []int64{}
 		iter := strings.SplitSeq(idxs, ",")
 		for id := range iter {

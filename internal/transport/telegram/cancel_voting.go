@@ -6,6 +6,7 @@ import (
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
+	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
@@ -65,6 +66,8 @@ func (h *CancelVotingHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 		})
 		return
 	}
+	fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
+	fsmutils.AppendMessageID(h.f, userID, paginatorMsg.ID)
 	h.f.Transition(userID, statePrepareCancelIDs, userID, ctx, b, update, paginatorMsg.ID)
 }
 
@@ -79,10 +82,14 @@ func (h *CancelVotingHandler) PrepareCancelIDs(f *fsm.FSM, args ...any) {
 	update := args[3].(*models.Update)
 	paginatorMsgID := args[4].(int)
 	f.Set(userID, "paginatorMsgID", paginatorMsgID)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Перечислите номера голосований, которые хотите отменить, через запятую.",
 	})
+	if err != nil {
+		return
+	}
+	fsmutils.AppendMessageID(f, userID, msg.ID)
 }
 
 func (h *CancelVotingHandler) Cancel(f *fsm.FSM, args ...any) {

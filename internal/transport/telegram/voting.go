@@ -61,7 +61,6 @@ func NewVotingHandler(movieService service.IMovieService, votingService service.
 
 func (h *VotingHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	userID := update.Message.From.ID
-	fmt.Println(userID)
 	h.fsm.Transition(userID, statePrepareVotingType, userID, ctx, b, update)
 }
 
@@ -80,7 +79,7 @@ func (h *VotingHandler) PrepareVotingType(f *fsm.FSM, args ...any) {
 		Button("Выбор фильма", []byte(SELECTION_TYPE), h.onInlineKeyboardSelect).
 		Button("Оценка фильма", []byte(RATING_TYPE), h.onInlineKeyboardSelect).
 		Row().
-		Button("Cancel", []byte("cancel"), h.onCancelSelect)
+		Button("Отменить", []byte("cancel"), h.onCancelSelect)
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
 		Text:        "Выбери тип голосования",
@@ -91,7 +90,6 @@ func (h *VotingHandler) PrepareVotingType(f *fsm.FSM, args ...any) {
 func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, update *models.Update, data []byte) {
 	userID := update.CallbackQuery.From.ID
 	currentState := h.fsm.Current(userID)
-	fmt.Println(userID)
 	if currentState == stateDefault {
 		return
 	}

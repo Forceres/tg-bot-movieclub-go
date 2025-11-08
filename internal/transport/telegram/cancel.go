@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 
+	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
@@ -26,18 +27,26 @@ func (h *CancelHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 	userID := update.Message.From.ID
 	currentState := h.f.Current(userID)
 	if currentState == stateDefault {
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "Нечего отменять!",
+		})
 		return
 	}
-	messageID, ok := h.f.Get(userID, "messageID")
+	messageIDs, ok := fsmutils.GetMessageIDs(h.f, userID)
 	if !ok {
+		b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: update.Message.ID,
+		})
 		return
 	}
-	h.f.Reset(userID)
-	_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		MessageID: messageID.(int),
+	_, err := b.DeleteMessages(ctx, &bot.DeleteMessagesParams{
+		ChatID:     update.Message.Chat.ID,
+		MessageIDs: append(messageIDs, update.Message.ID),
 	})
 	if err != nil {
 		return
 	}
+	h.f.Reset(userID)
 }
