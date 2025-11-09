@@ -35,7 +35,7 @@ func (r *VoteRepo) CalculateMaxMovieCount(votingID int64) (int64, int, error) {
 	err := r.db.Model(&model.Vote{}).
 		Select("MAX(movie_count) as max_count, movie_id").
 		Where("voting_id = ?", votingID).
-		Group("voting_id").
+		Group("voting_id, movie_id").
 		Scan(&result).Error
 	if err != nil {
 		return 0, 0, err
