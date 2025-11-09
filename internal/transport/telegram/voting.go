@@ -395,11 +395,6 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			}
 			log.Printf("Scheduled voting end task: %s", taskInfo.ID)
 		}
-	default:
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text:   "Неизвестный тип голосования.",
-		})
 	}
 
 	h.fsm.Reset(userID)

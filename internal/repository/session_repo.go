@@ -20,14 +20,8 @@ func NewSessionRepository(db *gorm.DB) ISessionRepo {
 
 func (r *SessionRepo) FindOrCreateSession(createdBy *int64) (*model.Session, error) {
 	var session *model.Session
-	err := r.db.Where("status = ?", "ongoing").First(&session).Error
-	if err == gorm.ErrRecordNotFound {
-		session = &model.Session{Status: "ongoing", CreatedBy: *createdBy}
-		if err := r.db.Create(&session).Error; err != nil {
-			return nil, err
-		}
-		return session, nil
-	} else if err != nil {
+	err := r.db.Where("status = ?", "ongoing").Attrs(&model.Session{Status: "ongoing", CreatedBy: *createdBy}).FirstOrCreate(&session).Error
+	if err != nil {
 		return nil, err
 	}
 	return session, nil
