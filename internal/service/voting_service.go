@@ -10,6 +10,8 @@ type IVotingService interface {
 	FindVotingByID(id int64) (*model.Voting, error)
 	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
 	FindVotingByStatus(status string) ([]*model.Voting, error)
+	FinishRatingVoting(votingID int64, pollId string, movieID int, mean float64) error
+	FinishSelectionVoting(votingID int64, pollId string, movieID int) error
 }
 
 type VotingService struct {
@@ -26,6 +28,24 @@ func (s *VotingService) CreateVoting(voting *model.Voting) (*model.Voting, error
 
 func (s *VotingService) FindVotingByID(id int64) (*model.Voting, error) {
 	return s.repo.FindVotingByID(id)
+}
+
+func (s *VotingService) FinishRatingVoting(votingID int64, pollId string, movieID int, mean float64) error {
+	return s.repo.FinishRatingVoting(&repository.FinishRatingVotingParams{
+		VotingID: votingID,
+		PollID:   pollId,
+		MovieID:  movieID,
+		Mean:     mean,
+	})
+}
+
+func (s *VotingService) FinishSelectionVoting(votingID int64, pollId string, movieID int) error {
+	return s.repo.FinishRatingVoting(&repository.FinishRatingVotingParams{
+		VotingID: votingID,
+		PollID:   pollId,
+		MovieID:  movieID,
+		Mean:     0,
+	})
 }
 
 func (s *VotingService) FindVotingByStatus(status string) ([]*model.Voting, error) {

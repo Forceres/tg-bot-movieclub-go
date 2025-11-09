@@ -5,50 +5,59 @@ import (
 	"gorm.io/gorm"
 )
 
-type IPollRepository interface {
+type UpdateStatusParams struct {
+	PollID string
+	Status string
+	Tx     *gorm.DB
+}
+
+type IPollRepo interface {
 	Create(poll *model.Poll) (*model.Poll, error)
 	CreatePollOption(option *model.PollOption) error
 	FindByPollID(pollID string) (*model.Poll, error)
 	FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error)
 	FindActivePolls() ([]model.Poll, error)
-	UpdateStatus(pollID string, status string) error
+	UpdateStatus(params *UpdateStatusParams) error
 }
 
-type PollRepository struct {
+type PollRepo struct {
 	db *gorm.DB
 }
 
-func NewPollRepository(db *gorm.DB) IPollRepository {
-	return &PollRepository{db: db}
+func NewPollRepository(db *gorm.DB) IPollRepo {
+	return &PollRepo{db: db}
 }
 
-func (r *PollRepository) Create(poll *model.Poll) (*model.Poll, error) {
+func (r *PollRepo) Create(poll *model.Poll) (*model.Poll, error) {
 	err := r.db.Create(poll).Error
 	return poll, err
 }
 
-func (r *PollRepository) CreatePollOption(option *model.PollOption) error {
+func (r *PollRepo) CreatePollOption(option *model.PollOption) error {
 	return r.db.Create(option).Error
 }
 
-func (r *PollRepository) FindByPollID(pollID string) (*model.Poll, error) {
+func (r *PollRepo) FindByPollID(pollID string) (*model.Poll, error) {
 	var poll model.Poll
 	err := r.db.Preload("Voting").Preload("Movie").Where("poll_id = ? AND status = ?", pollID, "active").First(&poll).Error
 	return &poll, err
 }
 
-func (r *PollRepository) FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error) {
+func (r *PollRepo) FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error) {
 	var options []model.PollOption
 	err := r.db.Preload("Movie").Where("poll_id = ?", pollID).Order("option_index").Find(&options).Error
 	return options, err
 }
 
-func (r *PollRepository) FindActivePolls() ([]model.Poll, error) {
+func (r *PollRepo) FindActivePolls() ([]model.Poll, error) {
 	var polls []model.Poll
 	err := r.db.Preload("Voting").Preload("Movie").Where("status = ?", "active").Find(&polls).Error
 	return polls, err
 }
 
-func (r *PollRepository) UpdateStatus(pollID string, status string) error {
-	return r.db.Model(&model.Poll{}).Where("poll_id = ?", pollID).Update("status", status).Error
+func (r *PollRepo) UpdateStatus(params *UpdateStatusParams) error {
+	if params.Tx == nil {
+		params.Tx = r.db
+	}
+	return params.Tx.Model(&model.Poll{}).Where("poll_id = ?", params.PollID).Update("status", params.Status).Error
 }

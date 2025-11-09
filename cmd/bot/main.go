@@ -11,7 +11,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
-	permission "github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/fsm"
 )
@@ -63,7 +63,11 @@ func main() {
 	defaultHandler := telegram.NewDefaultHandler(f)
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler.Handle),
-		bot.WithMiddlewares(permission.Authentication(cfg.Telegram.GroupID)),
+		bot.WithMiddlewares(
+			middleware.Authentication(cfg.Telegram.GroupID),
+			middleware.Log,
+			middleware.Delete,
+		),
 		bot.WithAllowedUpdates([]string{
 			AllowedUpdateMessage,
 			AllowedUpdateEditedMessage,

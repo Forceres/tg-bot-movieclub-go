@@ -9,11 +9,13 @@ import (
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/keyboard"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
 	"github.com/go-telegram/ui/paginator"
+	"github.com/hibiken/asynq"
 )
 
 var RATING_VOTING_OPTIONS = []models.InputPollOption{
@@ -40,6 +42,7 @@ type VotingHandler struct {
 	pollService   service.IPollService
 	voteService   service.IVoteService
 	fsm           *fsm.FSM
+	scheduler     *asynq.Client
 }
 
 type IVotingHandler interface {
@@ -55,8 +58,8 @@ const (
 	stateStartVoting           fsm.StateID = "start_voting"
 )
 
-func NewVotingHandler(movieService service.IMovieService, votingService service.IVotingService, pollService service.IPollService, voteService service.IVoteService, f *fsm.FSM) *VotingHandler {
-	return &VotingHandler{movieService: movieService, votingService: votingService, pollService: pollService, voteService: voteService, fsm: f}
+func NewVotingHandler(movieService service.IMovieService, votingService service.IVotingService, pollService service.IPollService, voteService service.IVoteService, f *fsm.FSM, scheduler *asynq.Client) *VotingHandler {
+	return &VotingHandler{movieService: movieService, votingService: votingService, pollService: pollService, voteService: voteService, fsm: f, scheduler: scheduler}
 }
 
 func (h *VotingHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -319,7 +322,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			if movieData == nil {
 				continue
 			}
-			movieID, _ := strconv.ParseInt((*movieData)[0], 10, 64)
+			movieID, _ := strconv.Atoi((*movieData)[0])
 
 			err := h.pollService.CreatePollOption(&model.PollOption{
 				PollID:      createdPoll.ID,
@@ -353,7 +356,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			if movieData == nil {
 				continue
 			}
-			movieID, _ := strconv.ParseInt((*movieData)[0], 10, 64)
+			movieID, _ := strconv.Atoi((*movieData)[0])
 
 			pollMsg, err := b.SendPoll(ctx, &bot.SendPollParams{
 				ChatID:            update.Message.Chat.ID,
@@ -378,6 +381,17 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			if err != nil {
 				log.Printf("Error saving poll: %v", err)
 			}
+			task, err := tasks.NewCloseRatingVotingTask(pollMsg.Poll.ID, update.Message.Chat.ID, createdVoting.ID, movieID)
+			if err != nil {
+				log.Printf("Error creating close rating voting task: %v", err)
+				continue
+			}
+			scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(time.Duration(duration.(int)) * time.Second)}
+			taskInfo, err := h.scheduler.Enqueue(task, scheduleOpts...)
+			if err != nil {
+				log.Printf("Error scheduling voting end task: %v", err)
+			}
+			log.Printf("Scheduled voting end task: %s", taskInfo.ID)
 		}
 	default:
 		b.SendMessage(ctx, &bot.SendMessageParams{

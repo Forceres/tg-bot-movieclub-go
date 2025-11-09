@@ -15,10 +15,10 @@ type IPollService interface {
 }
 
 type PollService struct {
-	pollRepo repository.IPollRepository
+	pollRepo repository.IPollRepo
 }
 
-func NewPollService(pollRepo repository.IPollRepository) IPollService {
+func NewPollService(pollRepo repository.IPollRepo) IPollService {
 	return &PollService{pollRepo: pollRepo}
 }
 
@@ -43,5 +43,8 @@ func (s *PollService) GetActivePolls() ([]model.Poll, error) {
 }
 
 func (s *PollService) ClosePoll(pollID string) error {
-	return s.pollRepo.UpdateStatus(pollID, "closed")
+	return s.pollRepo.UpdateStatus(&repository.UpdateStatusParams{
+		PollID: pollID,
+		Status: "closed",
+	})
 }

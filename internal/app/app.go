@@ -10,7 +10,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/kinopoisk"
-	permission "github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegraph"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -62,11 +62,11 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) *Handlers {
 	movieRepo := repository.NewMovieRepository(db)
 	movieService := service.NewMovieService(movieRepo)
 
-	votingRepo := repository.NewVotingRepository(db)
-	votingService := service.NewVotingService(votingRepo)
-
 	pollRepo := repository.NewPollRepository(db)
 	pollService := service.NewPollService(pollRepo)
+
+	votingRepo := repository.NewVotingRepository(db, pollRepo, movieRepo)
+	votingService := service.NewVotingService(votingRepo)
 
 	voteRepo := repository.NewVoteRepository(db)
 	voteService := service.NewVoteService(voteRepo)
@@ -77,7 +77,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) *Handlers {
 
 	currentMoviesHandler := telegram.NewCurrentMoviesHandler(movieService)
 	alreadyWatchedMoviesHandler := telegram.NewAlreadyWatchedMoviesHandler(movieService, telegraph)
-	votingHandler := telegram.NewVotingHandler(movieService, votingService, pollService, voteService, f)
+	votingHandler := telegram.NewVotingHandler(movieService, votingService, pollService, voteService, f, client)
 	suggestMovieHandler := telegram.NewSuggestMovieHandler(movieService, kinopoiskService)
 	cancelHandler := telegram.NewCancelHandler(f)
 	cancelVotingHandler := telegram.NewCancelVotingHandler(f, votingService)
@@ -108,10 +108,10 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) *Handlers {
 
 func RegisterHandlers(b *bot.Bot, handlers *Handlers, cfg *config.Config) {
 	b.RegisterHandlerMatchFunc(PollAnswerMatchFunc(), handlers.PollAnswerHandler)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, handlers.HelpHandler, permission.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, handlers.CurrentMoviesHandler, permission.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/already", bot.MatchTypeExact, handlers.AlreadyWatchedMoviesHandler, permission.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/voting", bot.MatchTypeExact, handlers.VotingHandler, permission.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, handlers.HelpHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, handlers.CurrentMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/already", bot.MatchTypeExact, handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/voting", bot.MatchTypeExact, handlers.VotingHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel", bot.MatchTypeExact, handlers.CancelHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel_voting", bot.MatchTypeExact, handlers.CancelVotingHandler)
