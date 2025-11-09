@@ -29,18 +29,20 @@ func (r *VoteRepo) Create(vote *model.Vote) error {
 
 func (r *VoteRepo) CalculateMaxMovieCount(votingID int64) (int64, int, error) {
 	var result struct {
-		MaxCount int64
-		MovieID  int
+		MovieCount int64
+		MovieID    int
 	}
 	err := r.db.Model(&model.Vote{}).
-		Select("MAX(movie_count) as max_count, movie_id").
+		Select("COUNT(*) as movie_count, movie_id").
 		Where("voting_id = ?", votingID).
-		Group("voting_id, movie_id").
+		Group("movie_id").
+		Order("movie_count DESC").
+		Limit(1).
 		Scan(&result).Error
 	if err != nil {
 		return 0, 0, err
 	}
-	return result.MaxCount, result.MovieID, nil
+	return result.MovieCount, result.MovieID, nil
 }
 
 func (r *VoteRepo) CalculateRatingMean(votingID int64) (float64, error) {
