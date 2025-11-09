@@ -8,15 +8,19 @@ import (
 	"github.com/celestix/telegraph-go/v2"
 )
 
-func InitTelegraph() (*telegraph.TelegraphClient, error) {
+type Telegraph struct {
+	Client *telegraph.TelegraphClient
+	Account *telegraph.Account
+}
+
+func InitTelegraph() (*Telegraph, error) {
 	client := telegraph.GetTelegraphClient(&telegraph.ClientOpt{
 		HttpClient: &http.Client{
 			Timeout: 6 * time.Second,
 		},
 	})
 
-	// Use this method to create account
-	_, err := client.CreateAccount("telegraph-go", &telegraph.CreateAccountOpts{
+	account, err := client.CreateAccount("telegraph-go", &telegraph.CreateAccountOpts{
 		AuthorName: "KinoClassBot",
 	})
 	if err != nil {
@@ -24,5 +28,5 @@ func InitTelegraph() (*telegraph.TelegraphClient, error) {
 		return nil, err
 	}
 
-	return client, nil
+	return &Telegraph{Client: client, Account: account}, nil
 }

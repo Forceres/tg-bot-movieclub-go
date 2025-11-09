@@ -8,78 +8,113 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
-	permission "github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
 	"github.com/go-telegram/bot"
-	"github.com/hibiken/asynq"
+	"github.com/go-telegram/fsm"
+)
+
+const stateDefault fsm.StateID = "default"
+
+const PRODUCTION = "PRODUCTION"
+
+const (
+	AllowedUpdateMessage                 string = "message"
+	AllowedUpdateEditedMessage           string = "edited_message"
+	AllowedUpdateChannelPost             string = "channel_post"
+	AllowedUpdateEditedChannelPost       string = "edited_channel_post"
+	AllowedUpdateBusinessConnection      string = "business_connection"
+	AllowedUpdateBusinessMessage         string = "business_message"
+	AllowedUpdateEditedBusinessMessage   string = "edited_business_message"
+	AllowedUpdateDeletedBusinessMessages string = "deleted_business_messages"
+	AllowedUpdateMessageReaction         string = "message_reaction"
+	AllowedUpdateMessageReactionCount    string = "message_reaction_count"
+	AllowedUpdateInlineQuery             string = "inline_query"
+	AllowedUpdateChosenInlineResult      string = "chosen_inline_result"
+	AllowedUpdateCallbackQuery           string = "callback_query"
+	AllowedUpdateShippingQuery           string = "shipping_query"
+	AllowedUpdatePreCheckoutQuery        string = "pre_checkout_query"
+	AllowedUpdatePurchasedPaidMedia      string = "purchased_paid_media"
+	AllowedUpdatePoll                    string = "poll"
+	AllowedUpdatePollAnswer              string = "poll_answer"
+	AllowedUpdateMyChatMember            string = "my_chat_member"
+	AllowedUpdateChatMember              string = "chat_member"
+	AllowedUpdateChatJoinRequest         string = "chat_join_request"
+	AllowedUpdateChatBoost               string = "chat_boost"
+	AllowedUpdateRemovedChatBoost        string = "removed_chat_boost"
 )
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
 	log.Println("Starting Telegram Movie Club Bot...")
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
-		panic(err)
 	}
-	log.Printf("Loaded Telegram Bot Token: %s", cfg.Telegram.BotToken)
-
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
-	defer client.Close()
-
-	// Initialize database
-	db, err := db.NewSqliteDB(cfg.Database)
-	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
-		panic(err)
-	}
-
-	println(db)
-
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
 	nodeEnv := os.Getenv("NODE_ENV")
-
-	movieRepo := repository.NewMovieRepository(db)
-	movieService := service.NewMovieService(movieRepo)
-
-	currentMoviesHandler := telegram.NewCurrentMoviesHandler(movieService)
-
-	if nodeEnv == "production" {
-		opts := []bot.Option{
-			bot.WithDefaultHandler(telegram.DefaultHandler),
-			bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken),
-		}
-
-		b, _ := bot.New(cfg.Telegram.BotToken, opts...)
-
-		// call methods.SetWebhook if needed
-
-		go b.StartWebhook(ctx)
-
-		err := http.ListenAndServe(":2000", b.WebhookHandler())
-
+	f := fsm.New(
+		stateDefault,
+		map[fsm.StateID]fsm.Callback{},
+	)
+	handlers := app.LoadApp(cfg, f)
+	defaultHandler := telegram.NewDefaultHandler(f)
+	opts := []bot.Option{
+		bot.WithDefaultHandler(defaultHandler.Handle),
+		bot.WithMiddlewares(
+			middleware.Authentication(cfg.Telegram.GroupID),
+			middleware.Log,
+			middleware.Delete,
+		),
+		bot.WithAllowedUpdates([]string{
+			AllowedUpdateMessage,
+			AllowedUpdateEditedMessage,
+			AllowedUpdateChannelPost,
+			AllowedUpdateEditedChannelPost,
+			AllowedUpdateCallbackQuery,
+			AllowedUpdatePoll,
+			AllowedUpdatePollAnswer,
+		}),
+	}
+	if nodeEnv == PRODUCTION {
+		err := startWebhook(ctx, opts, cfg, handlers)
 		if err != nil {
-			log.Fatalf("Failed to start webhook server: %v", err)
-			panic(err)
+			log.Fatalf("Failed to start webhook: %v", err)
 		}
 	} else {
-		opts := []bot.Option{
-			bot.WithDefaultHandler(telegram.DefaultHandler),
-		}
-		b, err := bot.New(cfg.Telegram.BotToken, opts...)
+		err := startLongPolling(ctx, opts, cfg, handlers)
 		if err != nil {
-			log.Fatalf("Failed to create bot: %v", err)
-			panic(err)
+			log.Fatalf("Failed to start long polling: %v", err)
 		}
-
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, permission.AdminOnly(cfg.Telegram.GroupID, telegram.HelpHandler))
-		b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, permission.AdminOnly(cfg.Telegram.GroupID, currentMoviesHandler.Handle))
-		b.Start(ctx)
 	}
 }
 
+func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
+	b, err := bot.New(cfg.Telegram.BotToken, opts...)
+	if err != nil {
+		log.Printf("Failed to create bot: %v", err)
+		return err
+	}
+	app.RegisterHandlers(b, handlers, cfg)
+	b.Start(ctx)
+	return nil
+}
+
+func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
+	opts = append(opts, bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken))
+	b, err := bot.New(cfg.Telegram.BotToken, opts...)
+	if err != nil {
+		log.Printf("Failed to create bot: %v", err)
+		return err
+	}
+	app.RegisterHandlers(b, handlers, cfg)
+	go b.StartWebhook(ctx)
+	err = http.ListenAndServe(":2000", b.WebhookHandler())
+	if err != nil {
+		log.Printf("Failed to start webhook server: %v", err)
+		return err
+	}
+	return nil
+}

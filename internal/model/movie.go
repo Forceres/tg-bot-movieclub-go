@@ -7,7 +7,7 @@ type Movie struct {
 	ID          int
 	Title       string
 	Description string
-	Director    string
+	Directors    string
 	Year        int
 	Countries		string
 	Genres			string

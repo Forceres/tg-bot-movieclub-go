@@ -2,20 +2,137 @@ package telegram
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"strconv"
+	"strings"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
+	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/go-telegram/fsm"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
-func DefaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.Message != nil {
-		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text:   update.Message.Text,
-		})
-		if err != nil {
-			log.Fatalf("Error in default handler: %v", err)
+type DefaultHandler struct {
+	f *fsm.FSM
+}
+
+func NewDefaultHandler(f *fsm.FSM) *DefaultHandler {
+	return &DefaultHandler{f: f}
+}
+
+func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	userID := update.Message.From.ID
+	chatID := update.Message.Chat.ID
+
+	currentState := h.f.Current(userID)
+
+	switch currentState {
+	case stateDefault:
+		return
+
+	case statePrepareVotingType:
+		return
+	case statePrepareVotingTitle:
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
+		title := cases.Title(language.Russian).String(update.Message.Text)
+		h.f.Set(userID, "title", title)
+
+		h.f.Transition(userID, statePrepareMovies, userID, ctx, b, update)
+	case statePrepareVotingDuration:
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
+		duration, errDuration := strconv.Atoi(update.Message.Text)
+		if errDuration != nil {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Введите корректное целое число",
+			})
+			return
 		}
+
+		h.f.Set(userID, "duration", duration)
+
+		h.f.Transition(userID, stateStartVoting, userID, ctx, b, update)
+	case statePrepareMovies:
+		indexes := update.Message.Text
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
+		movieIndexes := []int64{}
+		iter := strings.SplitSeq(indexes, ",")
+		for idx := range iter {
+			movieID, err := strconv.ParseInt(strings.TrimSpace(idx), 10, 64)
+			if err == nil {
+				movieIndexes = append(movieIndexes, movieID)
+			}
+		}
+
+		if len(movieIndexes) == 0 {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Введите корректные целые числа через запятую",
+			})
+			return
+		}
+
+		h.f.Set(userID, "movieIndexes", movieIndexes)
+
+		h.f.Transition(userID, statePrepareVotingDuration, userID, ctx, b, update)
+	case statePrepareCancelIDs:
+		idxs := update.Message.Text
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
+		cancelIndexes := []int64{}
+		iter := strings.SplitSeq(idxs, ",")
+		for id := range iter {
+			cancelID, err := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
+			if err == nil {
+				cancelIndexes = append(cancelIndexes, cancelID)
+			}
+		}
+
+		if len(cancelIndexes) == 0 {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Введите корректные целые числа через запятую",
+			})
+			return
+		}
+
+		votings, ok := h.f.Get(userID, "votings")
+		if !ok {
+			h.f.Reset(userID)
+			return
+		}
+
+		votingIDs := []int64{}
+
+		for _, idx := range cancelIndexes {
+			for votingIdx, voting := range votings.([]*model.Voting) {
+				if int64(votingIdx+1) == idx {
+					votingIDs = append(votingIDs, voting.ID)
+				}
+			}
+		}
+		paginatorMsgID, ok := h.f.Get(userID, "paginatorMsgID")
+		if !ok {
+			h.f.Reset(userID)
+			return
+		}
+		ok, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: paginatorMsgID.(int),
+		})
+		if err != nil || !ok {
+			h.f.Reset(userID)
+			return
+		}
+		h.f.Set(userID, "votingIDs", votingIDs)
+		h.f.Transition(userID, stateCancel, userID, ctx, b, update)
+	default:
+		fmt.Printf("unexpected state %s\n", currentState)
 	}
 }
