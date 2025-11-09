@@ -278,7 +278,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			return
 		}
 		movies, _ := f.Get(userID, "movies")
-		selectedMovieIndexes, _ := f.Get(userID, "movieIDs")
+		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		pollOpts := []models.InputPollOption{}
 		for _, index := range selectedMovieIndexes.([]int64) {
 			movieData := getByIndex(movies.([][]string), index)
@@ -289,18 +289,19 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 		}
 
 		poll, err := b.SendPoll(ctx, &bot.SendPollParams{
-			ChatID:      update.Message.Chat.ID,
-			Question:    createdVoting.Title,
-			Options:     pollOpts,
-			IsAnonymous: bot.False(),
-			Type:        "regular",
+			ChatID:            update.Message.Chat.ID,
+			Question:          createdVoting.Title,
+			Options:           pollOpts,
+			IsAnonymous:       bot.False(),
+			Type:              "regular",
+			QuestionParseMode: models.ParseModeMarkdown,
 		})
 		if err != nil {
 			b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,
 				Text:   "Ошибка при создании опроса.",
 			})
-			h.fsm.Transition(userID, stateDefault)
+			h.fsm.Reset(userID)
 			return
 		}
 
@@ -342,11 +343,11 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 				Text:   "Ошибка при создании голосования.",
 			})
-			h.fsm.Transition(userID, stateDefault)
+			h.fsm.Reset(userID)
 			return
 		}
 		movies, _ := f.Get(userID, "movies")
-		selectedMovieIndexes, _ := f.Get(userID, "movieIDs")
+		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		for _, index := range selectedMovieIndexes.([]int64) {
 			movieData := getByIndex(movies.([][]string), index)
 			if movieData == nil {
@@ -355,11 +356,12 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			movieID, _ := strconv.ParseInt((*movieData)[0], 10, 64)
 
 			pollMsg, err := b.SendPoll(ctx, &bot.SendPollParams{
-				ChatID:      update.Message.Chat.ID,
-				Question:    fmt.Sprintf("Оцените фильм: %s", (*movieData)[1]),
-				Options:     RATING_VOTING_OPTIONS,
-				IsAnonymous: bot.False(),
-				Type:        "regular",
+				ChatID:            update.Message.Chat.ID,
+				Question:          fmt.Sprintf("Оцените фильм: %s", (*movieData)[1]),
+				Options:           RATING_VOTING_OPTIONS,
+				IsAnonymous:       bot.False(),
+				Type:              "regular",
+				QuestionParseMode: models.ParseModeMarkdown,
 			})
 			if err != nil {
 				log.Printf("Error sending poll: %v", err)
@@ -384,7 +386,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 		})
 	}
 
-	h.fsm.Transition(userID, stateDefault)
+	h.fsm.Reset(userID)
 }
 
 func getByIndex(slice [][]string, index int64) *[]string {
@@ -400,10 +402,7 @@ func getByIndex(slice [][]string, index int64) *[]string {
 	return nil
 }
 
-// Universal poll answer handler - register once at bot startup
 func (h *VotingHandler) HandlePollAnswer(ctx context.Context, b *bot.Bot, update *models.Update) {
-	fmt.Println("handle poll answer")
-
 	poll, err := h.pollService.GetPollByPollID(update.PollAnswer.PollID)
 	if err != nil {
 		log.Printf("Poll not found: %s", update.PollAnswer.PollID)

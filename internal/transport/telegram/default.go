@@ -60,18 +60,18 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 
 		h.f.Transition(userID, stateStartVoting, userID, ctx, b, update)
 	case statePrepareMovies:
-		ids := update.Message.Text
+		indexes := update.Message.Text
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
-		movieIDs := []int64{}
-		iter := strings.SplitSeq(ids, ",")
-		for id := range iter {
-			movieID, err := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
+		movieIndexes := []int64{}
+		iter := strings.SplitSeq(indexes, ",")
+		for idx := range iter {
+			movieID, err := strconv.ParseInt(strings.TrimSpace(idx), 10, 64)
 			if err == nil {
-				movieIDs = append(movieIDs, movieID)
+				movieIndexes = append(movieIndexes, movieID)
 			}
 		}
 
-		if len(movieIDs) == 0 {
+		if len(movieIndexes) == 0 {
 			b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
 				Text:   "Введите корректные целые числа через запятую",
@@ -79,7 +79,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			return
 		}
 
-		h.f.Set(userID, "movieIDs", movieIDs)
+		h.f.Set(userID, "movieIndexes", movieIndexes)
 
 		h.f.Transition(userID, statePrepareVotingDuration, userID, ctx, b, update)
 	case statePrepareCancelIDs:

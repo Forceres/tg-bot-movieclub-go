@@ -7,11 +7,11 @@ import (
 )
 
 type Config struct {
-	Telegram TelegramConfig
-	Database DatabaseConfig
-	App      AppConfig
+	Telegram  TelegramConfig
+	Database  DatabaseConfig
+	App       AppConfig
 	Kinopoisk KinopoiskConfig
-	Redis    RedisConfig
+	Redis     RedisConfig
 }
 
 func LoadConfig() (*Config, error) {
@@ -21,14 +21,14 @@ func LoadConfig() (*Config, error) {
 
 	if nodeEnv == "production" {
 		err := cleanenv.ReadEnv(&cfg)
-		if err != nil {	
+		if err != nil {
 			return nil, err
 		}
 		return &cfg, nil
 	}
-	
+
 	err := cleanenv.ReadConfig(".env", &cfg)
-	if err != nil {	
+	if err != nil {
 		return nil, err
 	}
 	return &cfg, nil

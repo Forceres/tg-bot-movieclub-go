@@ -34,7 +34,18 @@ func PollAnswerMatchFunc() bot.MatchFunc {
 	}
 }
 
-func LoadApp(cfg *config.Config, b *bot.Bot, f *fsm.FSM) {
+type Handlers struct {
+	HelpHandler                 bot.HandlerFunc
+	CurrentMoviesHandler        bot.HandlerFunc
+	AlreadyWatchedMoviesHandler bot.HandlerFunc
+	VotingHandler               bot.HandlerFunc
+	PollAnswerHandler           bot.HandlerFunc
+	SuggestMovieHandler         bot.HandlerFunc
+	CancelHandler               bot.HandlerFunc
+	CancelVotingHandler         bot.HandlerFunc
+}
+
+func LoadApp(cfg *config.Config, f *fsm.FSM) *Handlers {
 	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
 	defer client.Close()
 
@@ -71,6 +82,17 @@ func LoadApp(cfg *config.Config, b *bot.Bot, f *fsm.FSM) {
 	cancelHandler := telegram.NewCancelHandler(f)
 	cancelVotingHandler := telegram.NewCancelVotingHandler(f, votingService)
 
+	handlers := &Handlers{
+		HelpHandler:                 telegram.HelpHandler,
+		CurrentMoviesHandler:        currentMoviesHandler.Handle,
+		AlreadyWatchedMoviesHandler: alreadyWatchedMoviesHandler.Handle,
+		VotingHandler:               votingHandler.Handle,
+		PollAnswerHandler:           votingHandler.HandlePollAnswer,
+		SuggestMovieHandler:         suggestMovieHandler.Handle,
+		CancelHandler:               cancelHandler.Handle,
+		CancelVotingHandler:         cancelVotingHandler.Handle,
+	}
+
 	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
 		statePrepareVotingType:     votingHandler.PrepareVotingType,
 		statePrepareVotingTitle:    votingHandler.PrepareVotingTitle,
@@ -81,12 +103,16 @@ func LoadApp(cfg *config.Config, b *bot.Bot, f *fsm.FSM) {
 		statePrepareCancelIDs:      cancelVotingHandler.PrepareCancelIDs,
 	})
 
-	b.RegisterHandlerMatchFunc(PollAnswerMatchFunc(), votingHandler.HandlePollAnswer)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, telegram.HelpHandler, permission.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, currentMoviesHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/already", bot.MatchTypeExact, alreadyWatchedMoviesHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/voting", bot.MatchTypeExact, votingHandler.Handle, permission.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, suggestMovieHandler.Handle)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel", bot.MatchTypeExact, cancelHandler.Handle)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel_voting", bot.MatchTypeExact, cancelVotingHandler.Handle)
+	return handlers
+}
+
+func RegisterHandlers(b *bot.Bot, handlers *Handlers, cfg *config.Config) {
+	b.RegisterHandlerMatchFunc(PollAnswerMatchFunc(), handlers.PollAnswerHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, handlers.HelpHandler, permission.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, handlers.CurrentMoviesHandler, permission.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/already", bot.MatchTypeExact, handlers.AlreadyWatchedMoviesHandler, permission.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/voting", bot.MatchTypeExact, handlers.VotingHandler, permission.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel", bot.MatchTypeExact, handlers.CancelHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel_voting", bot.MatchTypeExact, handlers.CancelVotingHandler)
 }

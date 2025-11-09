@@ -59,6 +59,7 @@ func main() {
 		stateDefault,
 		map[fsm.StateID]fsm.Callback{},
 	)
+	handlers := app.LoadApp(cfg, f)
 	defaultHandler := telegram.NewDefaultHandler(f)
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler.Handle),
@@ -74,35 +75,39 @@ func main() {
 		}),
 	}
 	if nodeEnv == PRODUCTION {
-		err := startWebhook(ctx, opts, cfg, f)
+		err := startWebhook(ctx, opts, cfg, handlers)
 		if err != nil {
 			log.Fatalf("Failed to start webhook: %v", err)
 		}
 	} else {
-		err := startLongPolling(ctx, opts, cfg, f)
+		err := startLongPolling(ctx, opts, cfg, handlers)
 		if err != nil {
 			log.Fatalf("Failed to start long polling: %v", err)
 		}
 	}
 }
 
-func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, f *fsm.FSM) error {
+func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
 	b, err := bot.New(cfg.Telegram.BotToken, opts...)
 	if err != nil {
 		log.Printf("Failed to create bot: %v", err)
 		return err
 	}
-	app.LoadApp(cfg, b, f)
+	app.RegisterHandlers(b, handlers, cfg)
 	b.Start(ctx)
 	return nil
 }
 
-func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, f *fsm.FSM) error {
+func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
 	opts = append(opts, bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken))
-	b, _ := bot.New(cfg.Telegram.BotToken, opts...)
-	app.LoadApp(cfg, b, f)
+	b, err := bot.New(cfg.Telegram.BotToken, opts...)
+	if err != nil {
+		log.Printf("Failed to create bot: %v", err)
+		return err
+	}
+	app.RegisterHandlers(b, handlers, cfg)
 	go b.StartWebhook(ctx)
-	err := http.ListenAndServe(":2000", b.WebhookHandler())
+	err = http.ListenAndServe(":2000", b.WebhookHandler())
 	if err != nil {
 		log.Printf("Failed to start webhook server: %v", err)
 		return err
