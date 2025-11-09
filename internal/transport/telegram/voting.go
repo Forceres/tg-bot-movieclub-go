@@ -334,21 +334,6 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			}
 		}
 	case RATING_TYPE:
-		voting := &model.Voting{
-			Title:      title.(string),
-			Type:       votingType.(string),
-			CreatedBy:  userID,
-			FinishedAt: &finishedAt,
-		}
-		createdVoting, err := h.votingService.CreateVoting(voting)
-		if err != nil {
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-				Text:   "Ошибка при создании голосования.",
-			})
-			h.fsm.Reset(userID)
-			return
-		}
 		movies, _ := f.Get(userID, "movies")
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		for _, index := range selectedMovieIndexes.([]int64) {
@@ -357,6 +342,23 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				continue
 			}
 			movieID, _ := strconv.Atoi((*movieData)[0])
+
+			voting := &model.Voting{
+				Title:      title.(string),
+				Type:       votingType.(string),
+				CreatedBy:  userID,
+				FinishedAt: &finishedAt,
+				MovieID:    &movieID,
+			}
+			createdVoting, err := h.votingService.CreateVoting(voting)
+			if err != nil {
+				b.SendMessage(ctx, &bot.SendMessageParams{
+					ChatID: update.CallbackQuery.Message.Message.Chat.ID,
+					Text:   "Ошибка при создании голосования.",
+				})
+				h.fsm.Reset(userID)
+				return
+			}
 
 			pollMsg, err := b.SendPoll(ctx, &bot.SendPollParams{
 				ChatID:            update.Message.Chat.ID,
