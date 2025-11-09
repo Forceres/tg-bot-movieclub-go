@@ -7,17 +7,17 @@ type Movie struct {
 	ID          int
 	Title       string
 	Description string
-	Directors    string
+	Directors   string
 	Year        int
-	Countries		string
-	Genres			string
+	Countries   string
+	Genres      string
 	Link        string
 	Duration    int
 	IMDBRating  float64
 	Rating      float64
-	StartedAt  string
-	FinishedAt string
-	SuggestedAt string
-	SuggestedBy	string
-	Sessions	 []Session `gorm:"many2many:movies_sessions;"` 
+	StartedAt   string
+	FinishedAt  string
+	SuggestedAt *int64
+	SuggestedBy *int64    `gorm:"default:null"`
+	Sessions    []Session `gorm:"many2many:movies_sessions;"`
 }

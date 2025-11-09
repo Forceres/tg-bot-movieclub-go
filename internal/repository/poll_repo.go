@@ -38,9 +38,9 @@ func (r *PollRepo) CreatePollOption(option *model.PollOption) error {
 }
 
 func (r *PollRepo) FindByPollID(pollID string) (*model.Poll, error) {
-	var poll model.Poll
-	err := r.db.Preload("Voting").Preload("Movie").Where("poll_id = ? AND status = ?", pollID, "active").First(&poll).Error
-	return &poll, err
+	var poll *model.Poll
+	err := r.db.Model(&model.Poll{}).Preload("Voting").Preload("Movie").Where("poll_id = ? AND status = ?", pollID, "active").First(&poll).Error
+	return poll, err
 }
 
 func (r *PollRepo) FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error) {

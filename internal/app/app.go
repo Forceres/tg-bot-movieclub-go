@@ -8,6 +8,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/kinopoisk"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
@@ -43,20 +44,85 @@ type Handlers struct {
 	SuggestMovieHandler         bot.HandlerFunc
 	CancelHandler               bot.HandlerFunc
 	CancelVotingHandler         bot.HandlerFunc
+	RegisterUserHandler         bot.HandlerFunc
+	UpdateChatMemberHandler     bot.HandlerFunc
 }
 
-func LoadApp(cfg *config.Config, f *fsm.FSM) *Handlers {
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
-	defer client.Close()
+type Middlewares struct {
+	Authentication bot.Middleware
+	AdminOnly      bot.Middleware
+	Log            bot.Middleware
+	Delete         bot.Middleware
+}
 
-	db, err := db.NewSqliteDB(cfg.Database)
-	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
-	}
+type Services struct {
+	UserService      service.IUserService
+	MovieService     service.IMovieService
+	KinopoiskService service.IKinopoiskService
+	VotingService    service.IVotingService
+	PollService      service.IPollService
+	VoteService      service.IVoteService
+	AsynqClient      *asynq.Client
+}
+
+func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services) {
+	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
 
 	telegraph, err := telegraph.InitTelegraph()
 	if err != nil {
 		log.Fatalf("Failed to initialize telegraph: %v", err)
+	}
+
+	services := LoadServices(cfg)
+
+	currentMoviesHandler := telegram.NewCurrentMoviesHandler(services.MovieService)
+	alreadyWatchedMoviesHandler := telegram.NewAlreadyWatchedMoviesHandler(services.MovieService, telegraph)
+	votingHandler := telegram.NewVotingHandler(services.MovieService, services.VotingService, services.PollService, services.VoteService, f, client)
+	suggestMovieHandler := telegram.NewSuggestMovieHandler(services.MovieService, services.KinopoiskService)
+	cancelHandler := telegram.NewCancelHandler(f)
+	cancelVotingHandler := telegram.NewCancelVotingHandler(f, services.VotingService)
+	registerUserHandler := telegram.NewRegisterUserHandler(services.UserService)
+	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
+
+	handlers := &Handlers{
+		HelpHandler:                 telegram.HelpHandler,
+		CurrentMoviesHandler:        currentMoviesHandler.Handle,
+		AlreadyWatchedMoviesHandler: alreadyWatchedMoviesHandler.Handle,
+		VotingHandler:               votingHandler.Handle,
+		PollAnswerHandler:           votingHandler.HandlePollAnswer,
+		SuggestMovieHandler:         suggestMovieHandler.Handle,
+		CancelHandler:               cancelHandler.Handle,
+		CancelVotingHandler:         cancelVotingHandler.Handle,
+		RegisterUserHandler:         registerUserHandler.Handle,
+		UpdateChatMemberHandler:     updateChatMemberHandler.Handle,
+	}
+
+	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
+		statePrepareVotingType:     votingHandler.PrepareVotingType,
+		statePrepareVotingTitle:    votingHandler.PrepareVotingTitle,
+		statePrepareVotingDuration: votingHandler.PrepareVotingDuration,
+		statePrepareMovies:         votingHandler.PrepareMovies,
+		stateStartVoting:           votingHandler.StartVoting,
+		stateCancel:                cancelVotingHandler.Cancel,
+		statePrepareCancelIDs:      cancelVotingHandler.PrepareCancelIDs,
+	})
+
+	middlewares := &Middlewares{
+		Authentication: middleware.Authentication(cfg.Telegram.GroupID, services.UserService),
+		AdminOnly:      middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService),
+		Log:            middleware.Log,
+		Delete:         middleware.Delete,
+	}
+
+	return handlers, middlewares, services
+}
+
+func LoadServices(cfg *config.Config) *Services {
+	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
+
+	db, err := db.NewSqliteDB(cfg.Database)
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
 	movieRepo := repository.NewMovieRepository(db)
@@ -71,48 +137,44 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) *Handlers {
 	voteRepo := repository.NewVoteRepository(db)
 	voteService := service.NewVoteService(voteRepo)
 
+	roleRepo := repository.NewRoleRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	userService := service.NewUserService(userRepo, roleRepo)
+
 	kinopoiskClient := &http.Client{}
 	kinopoiskAPI := kinopoisk.NewKinopoiskAPI(&cfg.Kinopoisk, kinopoiskClient)
 	kinopoiskService := service.NewKinopoiskService(kinopoiskAPI)
 
-	currentMoviesHandler := telegram.NewCurrentMoviesHandler(movieService)
-	alreadyWatchedMoviesHandler := telegram.NewAlreadyWatchedMoviesHandler(movieService, telegraph)
-	votingHandler := telegram.NewVotingHandler(movieService, votingService, pollService, voteService, f, client)
-	suggestMovieHandler := telegram.NewSuggestMovieHandler(movieService, kinopoiskService)
-	cancelHandler := telegram.NewCancelHandler(f)
-	cancelVotingHandler := telegram.NewCancelVotingHandler(f, votingService)
-
-	handlers := &Handlers{
-		HelpHandler:                 telegram.HelpHandler,
-		CurrentMoviesHandler:        currentMoviesHandler.Handle,
-		AlreadyWatchedMoviesHandler: alreadyWatchedMoviesHandler.Handle,
-		VotingHandler:               votingHandler.Handle,
-		PollAnswerHandler:           votingHandler.HandlePollAnswer,
-		SuggestMovieHandler:         suggestMovieHandler.Handle,
-		CancelHandler:               cancelHandler.Handle,
-		CancelVotingHandler:         cancelVotingHandler.Handle,
+	services := &Services{
+		UserService:      userService,
+		MovieService:     movieService,
+		KinopoiskService: kinopoiskService,
+		VotingService:    votingService,
+		PollService:      pollService,
+		VoteService:      voteService,
+		AsynqClient:      client,
 	}
 
-	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
-		statePrepareVotingType:     votingHandler.PrepareVotingType,
-		statePrepareVotingTitle:    votingHandler.PrepareVotingTitle,
-		statePrepareVotingDuration: votingHandler.PrepareVotingDuration,
-		statePrepareMovies:         votingHandler.PrepareMovies,
-		stateStartVoting:           votingHandler.StartVoting,
-		stateCancel:                cancelVotingHandler.Cancel,
-		statePrepareCancelIDs:      cancelVotingHandler.PrepareCancelIDs,
-	})
-
-	return handlers
+	return services
 }
 
-func RegisterHandlers(b *bot.Bot, handlers *Handlers, cfg *config.Config) {
+func RegisterTaskProcessors(services *Services, b *bot.Bot, mux *asynq.ServeMux) {
+	closeRatingVotingProcessor := tasks.NewCloseRatingVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
+	closeSelectionVotingProcessor := tasks.NewCloseSelectionVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
+	mux.HandleFunc(tasks.CloseRatingVotingTaskType, closeRatingVotingProcessor.Process)
+	mux.HandleFunc(tasks.CloseSelectionVotingTaskType, closeSelectionVotingProcessor.Process)
+
+}
+
+func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *config.Config) {
 	b.RegisterHandlerMatchFunc(PollAnswerMatchFunc(), handlers.PollAnswerHandler)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, handlers.HelpHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/now", bot.MatchTypeExact, handlers.CurrentMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/already", bot.MatchTypeExact, handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/voting", bot.MatchTypeExact, handlers.VotingHandler, middleware.AdminOnly(cfg.Telegram.GroupID))
+	b.RegisterHandlerMatchFunc(telegram.UpdateChatMemberMatchFunc(), handlers.UpdateChatMemberHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "help", bot.MatchTypeCommand, handlers.HelpHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "now", bot.MatchTypeCommand, handlers.CurrentMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "already", bot.MatchTypeCommand, handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService))
+	b.RegisterHandler(bot.HandlerTypeMessageText, "voting", bot.MatchTypeCommand, handlers.VotingHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService))
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel", bot.MatchTypeExact, handlers.CancelHandler)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/cancel_voting", bot.MatchTypeExact, handlers.CancelVotingHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel", bot.MatchTypeCommand, handlers.CancelHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_voting", bot.MatchTypeCommand, handlers.CancelVotingHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "register", bot.MatchTypeCommand, handlers.RegisterUserHandler)
 }

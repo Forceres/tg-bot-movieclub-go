@@ -18,7 +18,7 @@ const MOVIE_FORMAT = `
 <i>Режиссер: %s.</i>
 <i>Год: %d.</i>
 <i>Длительность в минутах: %d.</i>
-<i>Предложен: %s.</i>
+<i>Предложен: %d.</i>
 <i>Ссылка на кинопоиск: %s.</i>
 `
 
@@ -40,7 +40,7 @@ type IMovieService interface {
 	GetAlreadyWatchedMovies() ([]string, error)
 	GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error)
 	GetMovieByID(id int) (*model.Movie, error)
-	Create(movie *MovieDTO, suggestedBy string) error
+	Create(movie *MovieDTO, suggestedBy int64) error
 	generateHTMLForWatchedMovies(movies []model.Movie) []string
 }
 
@@ -52,7 +52,8 @@ func NewMovieService(repo repository.IMovieRepo) *MovieService {
 	return &MovieService{repo: repo}
 }
 
-func (s *MovieService) Create(movie *MovieDTO, suggestedBy string) error {
+func (s *MovieService) Create(movie *MovieDTO, suggestedBy int64) error {
+	suggestedAt := time.Now().Unix()
 	newMovie := model.Movie{
 		ID:          0,
 		Title:       movie.Title,
@@ -64,8 +65,8 @@ func (s *MovieService) Create(movie *MovieDTO, suggestedBy string) error {
 		Link:        movie.Link,
 		Duration:    movie.Duration,
 		IMDBRating:  movie.IMDBRating,
-		SuggestedBy: movie.SuggestedBy,
-		SuggestedAt: time.Now().String(),
+		SuggestedBy: &suggestedBy,
+		SuggestedAt: &suggestedAt,
 	}
 	return s.repo.Create(&newMovie)
 }
@@ -133,8 +134,8 @@ func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, 
 	list := make([][]string, len(movies))
 	for i, movie := range movies {
 		movieString := fmt.Sprintf(`%d. %s (%d)`, movie.ID, movie.Title, movie.Year)
-		if movie.SuggestedBy != "" {
-			movieString += fmt.Sprintf(" - предложил: %s", movie.SuggestedBy)
+		if movie.SuggestedBy != nil {
+			movieString += fmt.Sprintf(" - предложил: %d", *movie.SuggestedBy)
 		}
 		list[i] = []string{fmt.Sprint(movie.ID), bot.EscapeMarkdown(movieString)}
 	}
@@ -151,8 +152,8 @@ func (s *MovieService) generateHTMLForWatchedMovies(movies []model.Movie) []stri
 			rating = fmt.Sprintf("%.1f", movie.Rating)
 		}
 		var suggestedBy string = "Неизвестно"
-		if movie.SuggestedBy != "" {
-			suggestedBy = movie.SuggestedBy
+		if movie.SuggestedBy != nil {
+			suggestedBy = fmt.Sprintf("%d", *movie.SuggestedBy)
 		}
 		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, movie.StartedAt, suggestedBy, movie.Link))
 

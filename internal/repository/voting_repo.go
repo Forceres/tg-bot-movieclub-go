@@ -50,11 +50,11 @@ func (r *VotingRepo) CreateVoting(voting *model.Voting) (*model.Voting, error) {
 
 func (r *VotingRepo) FinishRatingVoting(params *FinishRatingVotingParams) error {
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		tx = tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix())
-		if tx.Error != nil {
-			return tx.Error
+		err := tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix()).Error
+		if err != nil {
+			return err
 		}
-		err := r.pollRepo.UpdateStatus(&UpdateStatusParams{
+		err = r.pollRepo.UpdateStatus(&UpdateStatusParams{
 			PollID: params.PollID,
 			Status: "closed",
 			Tx:     tx,
@@ -79,11 +79,11 @@ func (r *VotingRepo) FinishRatingVoting(params *FinishRatingVotingParams) error 
 
 func (r *VotingRepo) FinishSelectionVoting(params *FinishSelectionVotingParams) error {
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		tx = tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix())
-		if tx.Error != nil {
-			return tx.Error
+		err := tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix()).Error
+		if err != nil {
+			return err
 		}
-		err := r.pollRepo.UpdateStatus(&UpdateStatusParams{
+		err = r.pollRepo.UpdateStatus(&UpdateStatusParams{
 			PollID: params.PollID,
 			Status: "closed",
 			Tx:     tx,

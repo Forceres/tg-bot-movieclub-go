@@ -11,7 +11,6 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/fsm"
 )
@@ -59,14 +58,15 @@ func main() {
 		stateDefault,
 		map[fsm.StateID]fsm.Callback{},
 	)
-	handlers := app.LoadApp(cfg, f)
+	handlers, middlewares, services := app.LoadApp(cfg, f)
+	defer services.AsynqClient.Close()
 	defaultHandler := telegram.NewDefaultHandler(f)
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler.Handle),
 		bot.WithMiddlewares(
-			middleware.Authentication(cfg.Telegram.GroupID),
-			middleware.Log,
-			middleware.Delete,
+			middlewares.Authentication,
+			middlewares.Log,
+			middlewares.Delete,
 		),
 		bot.WithAllowedUpdates([]string{
 			AllowedUpdateMessage,
@@ -79,37 +79,37 @@ func main() {
 		}),
 	}
 	if nodeEnv == PRODUCTION {
-		err := startWebhook(ctx, opts, cfg, handlers)
+		err := startWebhook(ctx, opts, cfg, handlers, services)
 		if err != nil {
 			log.Fatalf("Failed to start webhook: %v", err)
 		}
 	} else {
-		err := startLongPolling(ctx, opts, cfg, handlers)
+		err := startLongPolling(ctx, opts, cfg, handlers, services)
 		if err != nil {
 			log.Fatalf("Failed to start long polling: %v", err)
 		}
 	}
 }
 
-func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
+func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers, services *app.Services) error {
 	b, err := bot.New(cfg.Telegram.BotToken, opts...)
 	if err != nil {
 		log.Printf("Failed to create bot: %v", err)
 		return err
 	}
-	app.RegisterHandlers(b, handlers, cfg)
+	app.RegisterHandlers(b, handlers, services, cfg)
 	b.Start(ctx)
 	return nil
 }
 
-func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
+func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers, services *app.Services) error {
 	opts = append(opts, bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken))
 	b, err := bot.New(cfg.Telegram.BotToken, opts...)
 	if err != nil {
 		log.Printf("Failed to create bot: %v", err)
 		return err
 	}
-	app.RegisterHandlers(b, handlers, cfg)
+	app.RegisterHandlers(b, handlers, services, cfg)
 	go b.StartWebhook(ctx)
 	err = http.ListenAndServe(":2000", b.WebhookHandler())
 	if err != nil {

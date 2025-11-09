@@ -4,11 +4,12 @@ import (
 	"context"
 	"log"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
 
-func CheckIfInGroup(ctx context.Context, b *bot.Bot, update *models.Update, groupID int64) bool {
+func CheckIfInGroup(ctx context.Context, b *bot.Bot, update *models.Update, groupID int64, userService service.IUserService) bool {
 	var userID int64
 	var chatID int64
 
@@ -25,6 +26,7 @@ func CheckIfInGroup(ctx context.Context, b *bot.Bot, update *models.Update, grou
 		log.Println("Update type is not supported for group check")
 		return false
 	}
+
 	chatMember, err := b.GetChatMember(ctx, &bot.GetChatMemberParams{
 		ChatID: groupID,
 		UserID: userID,
@@ -52,10 +54,26 @@ func CheckIfInGroup(ctx context.Context, b *bot.Bot, update *models.Update, grou
 		return false
 	}
 
+	if update.Message != nil && update.Message.Text == "/register" {
+		return true
+	}
+
+	_, err = userService.FindByID(userID)
+	if err != nil {
+		log.Printf("Authentication error -> %d is not registered: %v", userID, err)
+		if chatID != 0 {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Вы не зарегистрированы в системе кинокласса! Пожалуйста, используйте команду /register для регистрации.",
+			})
+		}
+		return false
+	}
+
 	return true
 }
 
-func CheckIfAdmin(ctx context.Context, b *bot.Bot, update *models.Update, groupID int64) bool {
+func CheckIfAdmin(ctx context.Context, b *bot.Bot, update *models.Update, groupID int64, userService service.IUserService) bool {
 	var userID int64
 	var chatID int64
 
@@ -87,7 +105,7 @@ func CheckIfAdmin(ctx context.Context, b *bot.Bot, update *models.Update, groupI
 		}
 		return false
 	}
-	// Check if user is in admins list
+
 	for _, chatMember := range chatAdmins {
 		if chatMember.Owner != nil && chatMember.Owner.User.ID == userID {
 			return true
@@ -95,6 +113,21 @@ func CheckIfAdmin(ctx context.Context, b *bot.Bot, update *models.Update, groupI
 		if chatMember.Administrator != nil && chatMember.Administrator.User.ID == userID {
 			return true
 		}
+	}
+
+	user, err := userService.FindByID(userID)
+	if err != nil {
+		log.Printf("Authentication error -> %d is not registered: %v", userID, err)
+		if chatID != 0 {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Вы не зарегистрированы в системе кинокласса! Пожалуйста, используйте команду /register для регистрации.",
+			})
+		}
+		return false
+	}
+	if user.Role.Name == "ADMIN" {
+		return true
 	}
 
 	log.Printf("Authentication error -> %d is not an administrator", userID)
@@ -105,10 +138,10 @@ func CheckIfAdmin(ctx context.Context, b *bot.Bot, update *models.Update, groupI
 	return false
 }
 
-func Authentication(groupID int64) bot.Middleware {
+func Authentication(groupID int64, userService service.IUserService) bot.Middleware {
 	return func(next bot.HandlerFunc) bot.HandlerFunc {
 		return func(ctx context.Context, b *bot.Bot, update *models.Update) {
-			if !CheckIfInGroup(ctx, b, update, groupID) {
+			if !CheckIfInGroup(ctx, b, update, groupID, userService) {
 				return
 			}
 			next(ctx, b, update)
@@ -116,14 +149,10 @@ func Authentication(groupID int64) bot.Middleware {
 	}
 }
 
-func AdminOnly(groupID int64) bot.Middleware {
+func AdminOnly(groupID int64, userService service.IUserService) bot.Middleware {
 	return func(next bot.HandlerFunc) bot.HandlerFunc {
 		return func(ctx context.Context, b *bot.Bot, update *models.Update) {
-			if !CheckIfInGroup(ctx, b, update, groupID) {
-				return
-			}
-
-			if !CheckIfAdmin(ctx, b, update, groupID) {
+			if !CheckIfAdmin(ctx, b, update, groupID, userService) {
 				return
 			}
 

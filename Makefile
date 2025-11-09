@@ -8,6 +8,10 @@ build:
 run:
 	go run ./cmd/bot
 
+# Run the worker
+run-worker:
+	go run ./cmd/worker	
+
 # Run tests
 test:
 	go test ./...
