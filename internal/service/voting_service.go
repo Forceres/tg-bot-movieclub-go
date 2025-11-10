@@ -1,10 +1,14 @@
 package service
 
 import (
+	"context"
+	"log"
 	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 	"gorm.io/gorm"
 )
 
@@ -23,6 +27,23 @@ type FinishRatingVotingParams struct {
 	CreatedBy int64
 }
 
+type VotingOptions struct {
+	Title      string
+	Type       string
+	CreatedBy  int64
+	FinishedAt *int64
+	MovieID    *int
+}
+
+type StartRatingVotingParams struct {
+	Bot         *bot.Bot
+	Context     context.Context
+	ChatID      int64
+	Options     VotingOptions
+	Question    string
+	PollOptions []models.InputPollOption
+}
+
 type IVotingService interface {
 	CreateVoting(voting *model.Voting) (*model.Voting, error)
 	FindVotingByID(id int64) (*model.Voting, error)
@@ -30,6 +51,7 @@ type IVotingService interface {
 	FindVotingByStatus(status string) ([]*model.Voting, error)
 	FinishRatingVoting(params *FinishRatingVotingParams) error
 	FinishSelectionVoting(params *FinishSelectionVotingParams) (int64, error)
+	StartVoting(params *StartRatingVotingParams) (*model.Poll, error)
 }
 
 type VotingService struct {
@@ -38,6 +60,7 @@ type VotingService struct {
 	movieRepo       repository.IMovieRepo
 	pollRepo        repository.IPollRepo
 	scheduleService IScheduleService
+	pollService     IPollService
 }
 
 func NewVotingService(repo repository.IVotingRepo, scheduleService IScheduleService, sessionRepo repository.ISessionRepo, movieRepo repository.IMovieRepo, pollRepo repository.IPollRepo) *VotingService {
@@ -137,6 +160,49 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 		return 0, err
 	}
 	return finishedAt, nil
+}
+
+func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Poll, error) {
+	voting := &model.Voting{
+		Title:      params.Options.Title,
+		Type:       params.Options.Type,
+		CreatedBy:  params.Options.CreatedBy,
+		FinishedAt: params.Options.FinishedAt,
+		MovieID:    params.Options.MovieID,
+	}
+	createdVoting, err := s.CreateVoting(voting)
+	if err != nil {
+		params.Bot.SendMessage(params.Context, &bot.SendMessageParams{
+			ChatID: params.ChatID,
+			Text:   "Ошибка при создании голосования.",
+		})
+		return nil, err
+	}
+	pollMsg, err := params.Bot.SendPoll(params.Context, &bot.SendPollParams{
+		ChatID:            params.ChatID,
+		Question:          params.Question,
+		Options:           params.PollOptions,
+		IsAnonymous:       bot.False(),
+		Type:              "regular",
+		QuestionParseMode: models.ParseModeMarkdown,
+	})
+	if err != nil {
+		log.Printf("Error sending poll: %v", err)
+		return nil, err
+	}
+	poll, err := s.pollService.CreatePoll(&model.Poll{
+		PollID:    pollMsg.Poll.ID,
+		MessageID: pollMsg.ID,
+		VotingID:  createdVoting.ID,
+		MovieID:   params.Options.MovieID,
+		Type:      "rating",
+		Status:    "active",
+	})
+	if err != nil {
+		log.Printf("Error saving poll: %v", err)
+		return nil, err
+	}
+	return poll, nil
 }
 
 func (s *VotingService) FindVotingByStatus(status string) ([]*model.Voting, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"strconv"
 
@@ -49,6 +50,28 @@ func NewCloseRatingVotingTaskProcessor(b *bot.Bot, votingService service.IVoting
 		voteService:   voteService,
 		movieService:  movieService,
 	}
+}
+
+type EnqueueCloseRatingVotingParams struct {
+	ChatID   int64
+	Duration int
+}
+
+func EnqueueCloseRatingVotingTask(client *asynq.Client, duration time.Duration, params *CloseRatingVotingPayload) error {
+	task, err := NewCloseRatingVotingTask(params.PollID, params.MessageID, params.ChatID, params.VotingID, params.MovieID)
+	if err != nil {
+		log.Printf("Error creating close rating voting task: %v", err)
+		return err
+	}
+	// seconds
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration)}
+	taskInfo, err := client.Enqueue(task, scheduleOpts...)
+	if err != nil {
+		log.Printf("Error scheduling voting end task: %v", err)
+		return err
+	}
+	log.Printf("Scheduled voting end task: %s", taskInfo.ID)
+	return nil
 }
 
 func (t *CloseRatingVotingTaskProcessor) Process(ctx context.Context, task *asynq.Task) error {

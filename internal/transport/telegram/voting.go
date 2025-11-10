@@ -10,6 +10,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/slice"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/keyboard"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -117,7 +118,7 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "Неизвестный выбор.",
 		})
-		h.fsm.Transition(userID, stateDefault)
+		h.fsm.Reset(userID)
 	}
 }
 
@@ -157,7 +158,7 @@ func (h *VotingHandler) onCancelSelect(ctx context.Context, b *bot.Bot, update *
 	if currentState == stateDefault {
 		return
 	}
-	h.fsm.Transition(userID, stateDefault)
+	h.fsm.Reset(userID)
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 		Text:   "Отменено.",
@@ -175,79 +176,46 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	update := args[3].(*models.Update)
 	data, _ := f.Get(userID, "type")
 	votingType := data.(string)
-
+	var movies [][]string
+	var err error
 	switch votingType {
 	case SELECTION_TYPE:
-		movies, err := h.movieService.GetSuggestedOrWatchedMovies(true)
-		if err != nil || len(movies) == 0 {
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.Message.Chat.ID,
-				Text:   "Увы в предложке ничего нет.",
-			})
-			f.Transition(userID, stateDefault)
-			return
-		}
-		f.Set(userID, "movies", movies)
-		opts := []paginator.Option{
-			paginator.PerPage(5),
-		}
-
-		var paginatedMovies []string
-		for _, movie := range movies {
-			paginatedMovies = append(paginatedMovies, movie[1])
-		}
-
-		p := paginator.New(b, paginatedMovies, opts...)
-		showOpts := []paginator.ShowOption{}
-		p.Show(ctx, b, update.Message.Chat.ID, showOpts...)
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text:   "Перечисли номера фильмов, которые должны быть в голосовании через запятую.",
-		})
+		movies, err = h.movieService.GetSuggestedOrWatchedMovies(true)
 	case RATING_TYPE:
-		movies, err := h.movieService.GetSuggestedOrWatchedMovies(false)
-		if err != nil || len(movies) == 0 {
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.Message.Chat.ID,
-				Text:   "Увы фильмов нет.",
-			})
-			f.Transition(userID, stateDefault)
-			return
-		}
-		f.Set(userID, "movies", movies)
-		opts := []paginator.Option{
-			paginator.PerPage(5),
-		}
-
-		var paginatedMovies []string
-		for _, movie := range movies {
-			paginatedMovies = append(paginatedMovies, movie[1])
-		}
-
-		p := paginator.New(b, paginatedMovies, opts...)
-		showOpts := []paginator.ShowOption{}
-		_, err = p.Show(ctx, b, update.Message.Chat.ID, showOpts...)
-		if err != nil {
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.Message.Chat.ID,
-				Text:   "Ошибка при показе пагинатора.",
-			})
-			log.Fatalln(err)
-			f.Transition(userID, stateDefault)
-			return
-		}
+		movies, err = h.movieService.GetSuggestedOrWatchedMovies(false)
+	}
+	if err != nil || len(movies) == 0 {
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Перечисли номера фильмов, которые должны быть оценены через запятую",
+			Text:   "Увы фильмов нет.",
 		})
-	default:
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text:   "Неизвестный тип голосования.",
-		})
-		f.Transition(userID, stateDefault)
+		f.Reset(userID)
 		return
 	}
+	f.Set(userID, "movies", movies)
+	opts := []paginator.Option{
+		paginator.PerPage(5),
+	}
+	var paginatedMovies []string
+	for _, movie := range movies {
+		paginatedMovies = append(paginatedMovies, movie[1])
+	}
+	p := paginator.New(b, paginatedMovies, opts...)
+	showOpts := []paginator.ShowOption{}
+	_, err = p.Show(ctx, b, update.Message.Chat.ID, showOpts...)
+	if err != nil {
+		log.Printf("Error showing paginator: %v", err)
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "Ошибка при показе пагинатора.",
+		})
+		f.Reset(userID)
+		return
+	}
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "Перечисли номера фильмов, которые должны быть оценены через запятую",
+	})
 }
 
 func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
@@ -262,197 +230,107 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 	duration, _ := h.fsm.Get(userID, "duration")
 	votingType, _ := h.fsm.Get(userID, "type")
 	title, _ := h.fsm.Get(userID, "title")
+	// time hour
 	finishedAt := time.Now().Add(time.Duration(duration.(int)) * time.Hour).Unix()
 	switch votingType.(string) {
 	case SELECTION_TYPE:
-		voting := &model.Voting{
-			Title:      title.(string),
-			Type:       votingType.(string),
-			CreatedBy:  userID,
-			FinishedAt: &finishedAt,
-		}
-		createdVoting, err := h.votingService.CreateVoting(voting)
-		if err != nil {
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-				Text:   "Ошибка при создании голосования.",
-			})
-			h.fsm.Transition(userID, stateDefault)
-			return
-		}
 		movies, _ := f.Get(userID, "movies")
+		movieIDs := []int{}
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		pollOpts := []models.InputPollOption{}
 		for _, index := range selectedMovieIndexes.([]int64) {
-			movieData := getByIndex(movies.([][]string), index)
+			movieData := slice.GetByIndex(movies.([][]string), index)
 			if movieData == nil {
 				continue
 			}
+			movieID, err := strconv.Atoi((*movieData)[0])
+			if err != nil {
+				log.Printf("Error converting movie ID: %v", err)
+				continue
+			}
+			movieIDs = append(movieIDs, movieID)
 			pollOpts = append(pollOpts, models.InputPollOption{Text: (*movieData)[1]})
 		}
-
-		poll, err := b.SendPoll(ctx, &bot.SendPollParams{
-			ChatID:            update.Message.Chat.ID,
-			Question:          createdVoting.Title,
-			Options:           pollOpts,
-			IsAnonymous:       bot.False(),
-			Type:              "regular",
-			QuestionParseMode: models.ParseModeMarkdown,
+		poll, err := h.votingService.StartVoting(&service.StartRatingVotingParams{
+			Bot:     b,
+			Context: ctx,
+			ChatID:  update.Message.Chat.ID,
+			Options: service.VotingOptions{
+				Title:      title.(string),
+				Type:       votingType.(string),
+				CreatedBy:  userID,
+				FinishedAt: &finishedAt,
+			},
+			PollOptions: pollOpts,
+			Question:    title.(string),
 		})
 		if err != nil {
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.Message.Chat.ID,
-				Text:   "Ошибка при создании опроса.",
-			})
-			h.fsm.Reset(userID)
+			log.Printf("Error while starting a voting: %v", err)
+			f.Reset(userID)
 			return
 		}
-		createdPoll, err := h.pollService.CreatePoll(&model.Poll{
-			PollID:    poll.Poll.ID,
-			MessageID: poll.ID,
-			VotingID:  createdVoting.ID,
-			Type:      "selection",
-			Status:    "active",
-		})
-		if err != nil {
-			log.Printf("Error saving poll: %v", err)
-		}
-		for optionIndex, index := range selectedMovieIndexes.([]int64) {
-			movieData := getByIndex(movies.([][]string), index)
-			if movieData == nil {
-				continue
-			}
-			movieID, _ := strconv.Atoi((*movieData)[0])
-
+		for optionIndex, id := range movieIDs {
 			err := h.pollService.CreatePollOption(&model.PollOption{
-				PollID:      createdPoll.ID,
+				PollID:      poll.ID,
 				OptionIndex: optionIndex,
-				MovieID:     movieID,
+				MovieID:     id,
 			})
 			if err != nil {
 				log.Printf("Error saving poll option: %v", err)
+				f.Reset(userID)
+				return
 			}
+		}
+		duration := time.Duration(duration.(int)) * time.Second
+		err = tasks.EnqueueCloseSelectionVotingTask(h.scheduler, duration, &tasks.CloseSelectionVotingPayload{
+			PollID:    poll.PollID,
+			MessageID: poll.MessageID,
+			ChatID:    update.Message.Chat.ID,
+			VotingID:  poll.VotingID,
+		})
+		if err != nil {
+			log.Printf("Error scheduling close rating voting task: %v", err)
 		}
 	case RATING_TYPE:
 		movies, _ := f.Get(userID, "movies")
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		for _, index := range selectedMovieIndexes.([]int64) {
-			movieData := getByIndex(movies.([][]string), index)
+			movieData := slice.GetByIndex(movies.([][]string), index)
 			if movieData == nil {
 				continue
 			}
 			movieID, _ := strconv.Atoi((*movieData)[0])
-
-			voting := &model.Voting{
-				Title:      title.(string),
-				Type:       votingType.(string),
-				CreatedBy:  userID,
-				FinishedAt: &finishedAt,
-				MovieID:    &movieID,
-			}
-			createdVoting, err := h.votingService.CreateVoting(voting)
+			poll, err := h.votingService.StartVoting(&service.StartRatingVotingParams{
+				Bot:     b,
+				Context: ctx,
+				ChatID:  update.Message.Chat.ID,
+				Options: service.VotingOptions{
+					Title:      title.(string),
+					Type:       votingType.(string),
+					CreatedBy:  userID,
+					FinishedAt: &finishedAt,
+					MovieID:    &movieID,
+				},
+				PollOptions: RATING_VOTING_OPTIONS,
+				Question:    fmt.Sprintf("Оцените фильм: %s", (*movieData)[1]),
+			})
 			if err != nil {
-				b.SendMessage(ctx, &bot.SendMessageParams{
-					ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-					Text:   "Ошибка при создании голосования.",
-				})
-				h.fsm.Reset(userID)
+				log.Printf("Error while starting a voting: %v", err)
+				f.Reset(userID)
 				return
 			}
-
-			pollMsg, err := b.SendPoll(ctx, &bot.SendPollParams{
-				ChatID:            update.Message.Chat.ID,
-				Question:          fmt.Sprintf("Оцените фильм: %s", (*movieData)[1]),
-				Options:           RATING_VOTING_OPTIONS,
-				IsAnonymous:       bot.False(),
-				Type:              "regular",
-				QuestionParseMode: models.ParseModeMarkdown,
+			duration := time.Duration(duration.(int)) * time.Second
+			err = tasks.EnqueueCloseRatingVotingTask(h.scheduler, duration, &tasks.CloseRatingVotingPayload{
+				PollID:    poll.PollID,
+				MessageID: poll.MessageID,
+				ChatID:    update.Message.Chat.ID,
+				VotingID:  poll.VotingID,
+				MovieID:   movieID,
 			})
 			if err != nil {
-				log.Printf("Error sending poll: %v", err)
-				continue
+				log.Printf("Error scheduling close rating voting task: %v", err)
 			}
-
-			_, err = h.pollService.CreatePoll(&model.Poll{
-				PollID:    pollMsg.Poll.ID,
-				MessageID: pollMsg.ID,
-				VotingID:  createdVoting.ID,
-				MovieID:   &movieID,
-				Type:      "rating",
-				Status:    "active",
-			})
-			if err != nil {
-				log.Printf("Error saving poll: %v", err)
-			}
-			task, err := tasks.NewCloseRatingVotingTask(pollMsg.Poll.ID, pollMsg.ID, update.Message.Chat.ID, createdVoting.ID, movieID)
-			if err != nil {
-				log.Printf("Error creating close rating voting task: %v", err)
-				continue
-			}
-			scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(time.Duration(duration.(int)) * time.Second)}
-			taskInfo, err := h.scheduler.Enqueue(task, scheduleOpts...)
-			if err != nil {
-				log.Printf("Error scheduling voting end task: %v", err)
-			}
-			log.Printf("Scheduled voting end task: %s", taskInfo.ID)
 		}
 	}
-
 	h.fsm.Reset(userID)
-}
-
-func getByIndex(slice [][]string, index int64) *[]string {
-	for _, item := range slice {
-		itemIndex, err := strconv.ParseInt(item[0], 10, 64)
-		if err != nil {
-			continue
-		}
-		if itemIndex == index {
-			return &item
-		}
-	}
-	return nil
-}
-
-func (h *VotingHandler) HandlePollAnswer(ctx context.Context, b *bot.Bot, update *models.Update) {
-	poll, err := h.pollService.GetPollByPollID(update.PollAnswer.PollID)
-	if err != nil {
-		log.Printf("Poll not found: %s", update.PollAnswer.PollID)
-		return
-	}
-
-	log.Printf("User %d voted in poll %s (type: %s)\n",
-		update.PollAnswer.User.ID,
-		update.PollAnswer.PollID,
-		poll.Type)
-
-	for _, optionID := range update.PollAnswer.OptionIDs {
-		vote := &model.Vote{
-			VotingID: poll.VotingID,
-			UserID:   update.PollAnswer.User.ID,
-		}
-
-		if poll.Type == RATING_TYPE {
-			rating := optionID + 1
-			vote.Rating = &rating
-			vote.MovieID = poll.MovieID
-		} else if poll.Type == SELECTION_TYPE {
-			options, err := h.pollService.GetPollOptionsByPollID(poll.ID)
-			if err != nil {
-				log.Printf("Error getting poll options: %v", err)
-				continue
-			}
-
-			if optionID < len(options) {
-				vote.MovieID = &options[optionID].MovieID
-			} else {
-				log.Printf("Invalid option ID: %d", optionID)
-				continue
-			}
-		}
-
-		if err := h.voteService.Create(vote); err != nil {
-			log.Printf("Error saving vote: %v", err)
-		}
-	}
 }

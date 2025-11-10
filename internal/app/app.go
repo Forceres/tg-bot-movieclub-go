@@ -83,13 +83,14 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	cancelVotingHandler := telegram.NewCancelVotingHandler(f, services.VotingService)
 	registerUserHandler := telegram.NewRegisterUserHandler(services.UserService)
 	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
+	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
 
 	handlers := &Handlers{
 		HelpHandler:                 telegram.HelpHandler,
 		CurrentMoviesHandler:        currentMoviesHandler.Handle,
 		AlreadyWatchedMoviesHandler: alreadyWatchedMoviesHandler.Handle,
 		VotingHandler:               votingHandler.Handle,
-		PollAnswerHandler:           votingHandler.HandlePollAnswer,
+		PollAnswerHandler:           pollAnswerHandler.Handle,
 		SuggestMovieHandler:         suggestMovieHandler.Handle,
 		CancelHandler:               cancelHandler.Handle,
 		CancelVotingHandler:         cancelVotingHandler.Handle,
@@ -166,9 +167,10 @@ func LoadServices(cfg *config.Config) *Services {
 func RegisterTaskProcessors(services *Services, b *bot.Bot, mux *asynq.ServeMux) {
 	closeRatingVotingProcessor := tasks.NewCloseRatingVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
 	closeSelectionVotingProcessor := tasks.NewCloseSelectionVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
+	openRatingVotingProcessor := tasks.NewOpenRatingVotingTaskProcessor(b, services.VotingService, services.MovieService, services.AsynqClient)
 	mux.HandleFunc(tasks.CloseRatingVotingTaskType, closeRatingVotingProcessor.Process)
 	mux.HandleFunc(tasks.CloseSelectionVotingTaskType, closeSelectionVotingProcessor.Process)
-
+	mux.HandleFunc(tasks.OpenRatingVotingTaskType, openRatingVotingProcessor.Process)
 }
 
 func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *config.Config) {

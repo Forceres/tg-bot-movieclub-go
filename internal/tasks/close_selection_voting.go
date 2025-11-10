@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/go-telegram/bot"
@@ -46,6 +47,22 @@ func NewCloseSelectionVotingTask(pollID string, messageID int, chatID int64, vot
 		return nil, err
 	}
 	return asynq.NewTask(CloseSelectionVotingTaskType, payload), nil
+}
+
+func EnqueueCloseSelectionVotingTask(client *asynq.Client, duration time.Duration, params *CloseSelectionVotingPayload) error {
+	task, err := NewCloseSelectionVotingTask(params.PollID, params.MessageID, params.ChatID, params.VotingID)
+	if err != nil {
+		log.Printf("Error creating close selection voting task: %v", err)
+		return err
+	}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration)}
+	taskInfo, err := client.Enqueue(task, scheduleOpts...)
+	if err != nil {
+		log.Printf("Error scheduling voting end task: %v", err)
+		return err
+	}
+	log.Printf("Scheduled voting end task: %s", taskInfo.ID)
+	return nil
 }
 
 func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *asynq.Task) error {
