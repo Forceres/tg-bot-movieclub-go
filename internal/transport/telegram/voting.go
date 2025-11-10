@@ -307,12 +307,12 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			h.fsm.Reset(userID)
 			return
 		}
-
 		createdPoll, err := h.pollService.CreatePoll(&model.Poll{
-			PollID:   poll.Poll.ID,
-			VotingID: createdVoting.ID,
-			Type:     "selection",
-			Status:   "active",
+			PollID:    poll.Poll.ID,
+			MessageID: poll.ID,
+			VotingID:  createdVoting.ID,
+			Type:      "selection",
+			Status:    "active",
 		})
 		if err != nil {
 			log.Printf("Error saving poll: %v", err)
@@ -374,16 +374,17 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			}
 
 			_, err = h.pollService.CreatePoll(&model.Poll{
-				PollID:   pollMsg.Poll.ID,
-				VotingID: createdVoting.ID,
-				MovieID:  &movieID,
-				Type:     "rating",
-				Status:   "active",
+				PollID:    pollMsg.Poll.ID,
+				MessageID: pollMsg.ID,
+				VotingID:  createdVoting.ID,
+				MovieID:   &movieID,
+				Type:      "rating",
+				Status:    "active",
 			})
 			if err != nil {
 				log.Printf("Error saving poll: %v", err)
 			}
-			task, err := tasks.NewCloseRatingVotingTask(pollMsg.Poll.ID, update.Message.Chat.ID, createdVoting.ID, movieID)
+			task, err := tasks.NewCloseRatingVotingTask(pollMsg.Poll.ID, pollMsg.ID, update.Message.Chat.ID, createdVoting.ID, movieID)
 			if err != nil {
 				log.Printf("Error creating close rating voting task: %v", err)
 				continue

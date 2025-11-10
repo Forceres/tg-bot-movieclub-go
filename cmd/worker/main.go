@@ -1,10 +1,7 @@
 package main
 
 import (
-	"context"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
@@ -13,9 +10,6 @@ import (
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
@@ -42,8 +36,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
-
-	go b.Start(ctx)
 
 	app.RegisterTaskProcessors(services, b, mux)
 

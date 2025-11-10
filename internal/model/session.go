@@ -5,7 +5,7 @@ import "gorm.io/gorm"
 type Session struct {
 	gorm.Model
 	ID         int64 `gorm:"primaryKey"`
-	FinishedAt string
+	FinishedAt int64
 	Status     string   `gorm:"default:'planned'"` // planned, ongoing, finished, cancelled
 	CreatedBy  int64    `gorm:"not null"`
 	Creator    User     `gorm:"foreignKey:CreatedBy"`

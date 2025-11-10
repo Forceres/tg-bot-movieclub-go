@@ -41,9 +41,11 @@ func NewSqliteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	db.AutoMigrate(&model.Vote{})
 	db.AutoMigrate(&model.Poll{})
 	db.AutoMigrate(&model.PollOption{})
+	db.AutoMigrate(&model.Schedule{})
 
-	// Seed roles
+	// Seed data
 	seedRoles(db)
+	seedDefaultSchedule(db)
 
 	return db, nil
 }
@@ -63,6 +65,26 @@ func seedRoles(db *gorm.DB) {
 			} else {
 				log.Printf("Created role: %s", role.Name)
 			}
+		}
+	}
+}
+
+func seedDefaultSchedule(db *gorm.DB) {
+	var count int64
+	db.Model(&model.Schedule{}).Count(&count)
+
+	if count == 0 {
+		defaultSchedule := model.Schedule{
+			Weekday:  0,
+			Hour:     21,
+			Minute:   30,
+			IsActive: true,
+		}
+
+		if err := db.Create(&defaultSchedule).Error; err != nil {
+			log.Printf("Failed to create default schedule: %v", err)
+		} else {
+			log.Printf("Created default schedule: Monday at 21:30")
 		}
 	}
 }

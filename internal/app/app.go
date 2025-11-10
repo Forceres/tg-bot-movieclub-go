@@ -131,8 +131,13 @@ func LoadServices(cfg *config.Config) *Services {
 	pollRepo := repository.NewPollRepository(db)
 	pollService := service.NewPollService(pollRepo)
 
+	scheduleRepo := repository.NewScheduleRepository(db)
+	scheduleService := service.NewScheduleService(scheduleRepo)
+
+	sessionRepo := repository.NewSessionRepository(db)
+
 	votingRepo := repository.NewVotingRepository(db, pollRepo, movieRepo)
-	votingService := service.NewVotingService(votingRepo)
+	votingService := service.NewVotingService(votingRepo, scheduleService, sessionRepo, movieRepo, pollRepo)
 
 	voteRepo := repository.NewVoteRepository(db)
 	voteService := service.NewVoteService(voteRepo)

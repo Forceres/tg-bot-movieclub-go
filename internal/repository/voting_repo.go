@@ -7,28 +7,18 @@ import (
 	"gorm.io/gorm"
 )
 
-type FinishRatingVotingParams struct {
+type FinishVotingParams struct {
 	VotingID int64
-	PollID   string
-	MovieID  int
-	Mean     float64
 	Tx       *gorm.DB
 }
 
-type FinishSelectionVotingParams struct {
-	VotingID   int64
-	PollID     string
-	MovieID    int
-	FinishedAt string
-	Tx         *gorm.DB
-}
-
 type IVotingRepo interface {
+	Transaction(txFunc func(tx *gorm.DB) error) error
 	CreateVoting(voting *model.Voting) (*model.Voting, error)
 	FindVotingByID(id int64) (*model.Voting, error)
 	FindVotingsByStatus(status string) ([]*model.Voting, error)
 	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
-	FinishRatingVoting(params *FinishRatingVotingParams) error
+	FinishVoting(params *FinishVotingParams) error
 }
 
 type VotingRepo struct {
@@ -41,6 +31,10 @@ func NewVotingRepository(db *gorm.DB, pollRepo IPollRepo, movieRepo IMovieRepo) 
 	return &VotingRepo{db: db, pollRepo: pollRepo, movieRepo: movieRepo}
 }
 
+func (r *VotingRepo) Transaction(txFunc func(tx *gorm.DB) error) error {
+	return r.db.Transaction(txFunc)
+}
+
 func (r *VotingRepo) CreateVoting(voting *model.Voting) (*model.Voting, error) {
 	if err := r.db.Create(&voting).Error; err != nil {
 		return nil, err
@@ -48,60 +42,12 @@ func (r *VotingRepo) CreateVoting(voting *model.Voting) (*model.Voting, error) {
 	return voting, nil
 }
 
-func (r *VotingRepo) FinishRatingVoting(params *FinishRatingVotingParams) error {
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		err := tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix()).Error
-		if err != nil {
-			return err
-		}
-		err = r.pollRepo.UpdateStatus(&UpdateStatusParams{
-			PollID: params.PollID,
-			Status: "closed",
-			Tx:     tx,
-		})
-		if err != nil {
-			return err
-		}
-		err = r.movieRepo.UpdateRating(&UpdateRatingParams{
-			MovieID: params.MovieID,
-			Rating:  params.Mean,
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
+func (r *VotingRepo) FinishVoting(params *FinishVotingParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
 	}
-	return nil
-}
-
-func (r *VotingRepo) FinishSelectionVoting(params *FinishSelectionVotingParams) error {
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		err := tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix()).Error
-		if err != nil {
-			return err
-		}
-		err = r.pollRepo.UpdateStatus(&UpdateStatusParams{
-			PollID: params.PollID,
-			Status: "closed",
-			Tx:     tx,
-		})
-		if err != nil {
-			return err
-		}
-		// err = r.movieRepo.UpdateDates(&UpdateDatesParams{
-		// 	MovieID:    params.MovieID,
-		// 	StartedAt:  time.Now().String(),
-		// 	FinishedAt: params.FinishedAt,
-		// 	Tx:         tx,
-		// })
-		// if err != nil {
-		// 	return err
-		// }
-		return nil
-	})
+	err := tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix()).Error
 	if err != nil {
 		return err
 	}

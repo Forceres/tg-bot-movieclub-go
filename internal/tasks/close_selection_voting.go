@@ -21,9 +21,10 @@ type CloseSelectionVotingTaskProcessor struct {
 }
 
 type CloseSelectionVotingPayload struct {
-	PollID   string `json:"poll_id"`
-	ChatID   int64  `json:"chat_id"`
-	VotingID int64  `json:"voting_id"`
+	PollID    string `json:"poll_id"`
+	MessageID int    `json:"message_id"`
+	ChatID    int64  `json:"chat_id"`
+	VotingID  int64  `json:"voting_id"`
 }
 
 type ICloseSelectionVotingProcessor interface {
@@ -39,8 +40,8 @@ func NewCloseSelectionVotingTaskProcessor(b *bot.Bot, votingService service.IVot
 	}
 }
 
-func NewCloseSelectionVotingTask(pollID string, chatID int64, votingID int64) (*asynq.Task, error) {
-	payload, err := json.Marshal(CloseSelectionVotingPayload{PollID: pollID, ChatID: chatID, VotingID: votingID})
+func NewCloseSelectionVotingTask(pollID string, messageID int, chatID int64, votingID int64) (*asynq.Task, error) {
+	payload, err := json.Marshal(CloseSelectionVotingPayload{PollID: pollID, MessageID: messageID, ChatID: chatID, VotingID: votingID})
 	if err != nil {
 		return nil, err
 	}
@@ -52,13 +53,9 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 	if err := json.Unmarshal(task.Payload(), &p); err != nil {
 		return err
 	}
-	messageID, err := strconv.Atoi(p.PollID)
-	if err != nil {
-		return err
-	}
 	ok, err := t.b.DeleteMessage(ctx, &bot.DeleteMessageParams{
 		ChatID:    p.ChatID,
-		MessageID: messageID,
+		MessageID: p.MessageID,
 	})
 	if err != nil || !ok {
 		log.Println("Message doesn't exist or couldn't be deleted")
@@ -72,7 +69,12 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 	if err != nil {
 		return err
 	}
-	err = t.votingService.FinishSelectionVoting(p.VotingID, p.PollID, movie.ID)
+	_, err = t.votingService.FinishSelectionVoting(&service.FinishSelectionVotingParams{
+		VotingID:  p.VotingID,
+		PollID:    p.PollID,
+		MovieID:   movie.ID,
+		CreatedBy: p.ChatID,
+	})
 	if err != nil {
 		return err
 	}
