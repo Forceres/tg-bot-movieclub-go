@@ -27,6 +27,10 @@ func CheckIfInGroup(ctx context.Context, b *bot.Bot, update *models.Update, grou
 		return false
 	}
 
+	if b.ID() == userID {
+		return true
+	}
+
 	chatMember, err := b.GetChatMember(ctx, &bot.GetChatMemberParams{
 		ChatID: groupID,
 		UserID: userID,
