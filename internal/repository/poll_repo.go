@@ -65,8 +65,9 @@ func (r *PollRepo) FindActivePolls() ([]model.Poll, error) {
 }
 
 func (r *PollRepo) UpdateStatus(params *UpdateStatusParams) error {
-	if params.Tx == nil {
-		params.Tx = r.db
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
 	}
-	return params.Tx.Model(&model.Poll{}).Where("poll_id = ?", params.PollID).Update("status", params.Status).Error
+	return tx.Model(&model.Poll{}).Where(&model.Poll{PollID: params.PollID}).Update("status", params.Status).Error
 }

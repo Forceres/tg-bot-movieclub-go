@@ -76,8 +76,8 @@ func main() {
 			Rating:      movie.Rating,
 			SuggestedAt: suggestedAt,
 			Duration:    movie.Duration,
-			StartedAt:   movie.StartWatch,  // Map from StartWatch
-			FinishedAt:  movie.FinishWatch, // Map from FinishWatch
+			StartedAt:   &movie.StartWatch,  // Map from StartWatch
+			FinishedAt:  &movie.FinishWatch, // Map from FinishWatch
 		})
 	}
 

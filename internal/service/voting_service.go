@@ -60,7 +60,6 @@ type VotingService struct {
 	movieRepo       repository.IMovieRepo
 	pollRepo        repository.IPollRepo
 	scheduleService IScheduleService
-	pollService     IPollService
 }
 
 func NewVotingService(repo repository.IVotingRepo, scheduleService IScheduleService, sessionRepo repository.ISessionRepo, movieRepo repository.IMovieRepo, pollRepo repository.IPollRepo) *VotingService {
@@ -126,9 +125,10 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 		if err != nil {
 			return err
 		}
+		startedAt := time.Now().String()
 		err = s.movieRepo.UpdateDates(&repository.UpdateDatesParams{
 			MovieID:   params.MovieID,
-			StartedAt: time.Now().String(),
+			StartedAt: &startedAt,
 			Tx:        tx,
 		})
 		if err != nil {
@@ -206,13 +206,9 @@ func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Pol
 			Status:    "active",
 		}
 
-		log.Printf("%s - %d - %d - %s - %s", pollModel.PollID, pollModel.MessageID, pollModel.VotingID, pollModel.Type, pollModel.Status)
-
 		if params.Options.MovieID != nil {
 			pollModel.MovieID = params.Options.MovieID
 		}
-
-		log.Printf("movieID: %v", pollModel.MovieID)
 
 		poll, err = s.pollRepo.Create(&repository.CreatePollParams{
 			Poll: pollModel,

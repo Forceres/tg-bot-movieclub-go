@@ -1,6 +1,9 @@
 package date
 
-import "time"
+import (
+	"log"
+	"time"
+)
 
 type GetRelativeDateParams struct {
 	Day      *int
@@ -10,23 +13,28 @@ type GetRelativeDateParams struct {
 }
 
 func GetRelativeDate(params *GetRelativeDateParams) int64 {
-	var day int
-	var hour int
-	var minute int
+	var day int = 1
+	var hour int = 21
+	var minute int = 30
 	var location *time.Location
 
 	if params.Location != nil {
 		var err error
 		location, err = time.LoadLocation(*params.Location)
 		if err != nil {
+			log.Printf("Error loading location: %v", err)
 			location = time.FixedZone("UTC+3", 3*60*60)
 		}
 	}
 
-	if params.Day == nil && params.Hour == nil && params.Minute == nil {
-		day = 3
-		hour = 21
-		minute = 30
+	if params.Hour != nil {
+		hour = *params.Hour
+	}
+	if params.Minute != nil {
+		minute = *params.Minute
+	}
+	if params.Day != nil {
+		day = *params.Day
 	}
 
 	now := time.Now()

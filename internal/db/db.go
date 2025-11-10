@@ -75,7 +75,7 @@ func seedDefaultSchedule(db *gorm.DB) {
 
 	if count == 0 {
 		defaultSchedule := model.Schedule{
-			Weekday:  0,
+			Weekday:  1,
 			Hour:     21,
 			Minute:   30,
 			IsActive: true,

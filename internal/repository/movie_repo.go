@@ -12,10 +12,9 @@ type UpdateRatingParams struct {
 }
 
 type UpdateDatesParams struct {
-	MovieID    int
-	StartedAt  string
-	FinishedAt string
-	Tx         *gorm.DB
+	MovieID   int
+	StartedAt *string
+	Tx        *gorm.DB
 }
 
 type IMovieRepo interface {
@@ -53,14 +52,7 @@ func (r *MovieRepo) UpdateDates(params *UpdateDatesParams) error {
 	if tx == nil {
 		tx = r.db
 	}
-	updates := map[string]string{}
-	if params.StartedAt != "" {
-		updates["started_at"] = params.StartedAt
-	}
-	if params.FinishedAt != "" {
-		updates["finished_at"] = params.FinishedAt
-	}
-	return tx.Model(&model.Movie{ID: params.MovieID}).Updates(updates).Error
+	return tx.Model(&model.Movie{}).Where(&model.Movie{ID: params.MovieID}).Update("started_at", params.StartedAt).Error
 }
 
 func (r *MovieRepo) GetMovieByID(id int) (*model.Movie, error) {
@@ -88,7 +80,7 @@ func (r *MovieRepo) GetCurrentMovies() ([]model.Movie, error) {
 
 func (r *MovieRepo) GetAlreadyWatchedMovies() ([]model.Movie, error) {
 	var movies []model.Movie
-	if err := r.db.Model(&model.Movie{}).Where(r.db.Not(&model.Movie{FinishedAt: ""})).Find(&movies).Error; err != nil {
+	if err := r.db.Model(&model.Movie{}).Where(r.db.Not(&model.Movie{FinishedAt: nil})).Find(&movies).Error; err != nil {
 		return nil, err
 	}
 	return movies, nil

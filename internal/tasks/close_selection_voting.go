@@ -79,6 +79,7 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 	}
 	count, movieID, err := t.voteService.CalculateMaxMovieCount(p.VotingID)
 	if err != nil {
+		log.Printf("Error calculating max movie count: %v", err)
 		return err
 	}
 	if count == 0 || movieID == 0 {
@@ -88,6 +89,7 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 	log.Printf("Max movie count: %d for movie ID: %d", count, movieID)
 	movie, err := t.movieService.GetMovieByID(movieID)
 	if err != nil {
+		log.Printf("Error getting movie by ID: %v", err)
 		return err
 	}
 	_, err = t.votingService.FinishSelectionVoting(&service.FinishSelectionVotingParams{
@@ -97,6 +99,7 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 		CreatedBy: p.ChatID,
 	})
 	if err != nil {
+		log.Printf("Error finishing selection voting: %v", err)
 		return err
 	}
 	_, err = t.b.SendMessage(ctx, &bot.SendMessageParams{
@@ -104,6 +107,7 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 		Text:   "Финальное решение принято! Победил фильм: " + movie.Title + "; с количеством голосов: " + strconv.FormatInt(count, 10),
 	})
 	if err != nil {
+		log.Printf("Error sending final decision message: %v", err)
 		return err
 	}
 	return nil

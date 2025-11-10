@@ -15,8 +15,8 @@ type Movie struct {
 	Duration    int
 	IMDBRating  float64
 	Rating      float64
-	StartedAt   string
-	FinishedAt  string
+	StartedAt   *string `gorm:"default:null"`
+	FinishedAt  *string `gorm:"default:null"`
 	SuggestedAt *int64
 	SuggestedBy *int64    `gorm:"default:null"`
 	Sessions    []Session `gorm:"many2many:movies_sessions;"`

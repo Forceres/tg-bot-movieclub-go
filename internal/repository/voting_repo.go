@@ -57,7 +57,11 @@ func (r *VotingRepo) FinishVoting(params *FinishVotingParams) error {
 	if params.Tx != nil {
 		tx = params.Tx
 	}
-	err := tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix()).Error
+	updates := map[string]interface{}{
+		"status":      "inactive",
+		"finished_at": time.Now().Unix(),
+	}
+	err := tx.Model(&model.Voting{}).Where(&model.Voting{ID: params.VotingID}).Updates(updates).Error
 	if err != nil {
 		return err
 	}
