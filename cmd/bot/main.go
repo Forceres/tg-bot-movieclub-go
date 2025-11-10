@@ -66,7 +66,6 @@ func main() {
 		bot.WithMiddlewares(
 			middlewares.Authentication,
 			middlewares.Log,
-			middlewares.Delete,
 		),
 		bot.WithAllowedUpdates([]string{
 			AllowedUpdateMessage,
