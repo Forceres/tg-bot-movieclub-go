@@ -68,7 +68,7 @@ func NewVotingService(repo repository.IVotingRepo, scheduleService IScheduleServ
 }
 
 func (s *VotingService) CreateVoting(voting *model.Voting) (*model.Voting, error) {
-	return s.repo.CreateVoting(voting)
+	return s.repo.CreateVoting(&repository.CreateVotingParams{Voting: voting})
 }
 
 func (s *VotingService) FindVotingByID(id int64) (*model.Voting, error) {
@@ -163,43 +163,68 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 }
 
 func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Poll, error) {
-	voting := &model.Voting{
-		Title:      params.Options.Title,
-		Type:       params.Options.Type,
-		CreatedBy:  params.Options.CreatedBy,
-		FinishedAt: params.Options.FinishedAt,
-		MovieID:    params.Options.MovieID,
-	}
-	createdVoting, err := s.CreateVoting(voting)
-	if err != nil {
-		params.Bot.SendMessage(params.Context, &bot.SendMessageParams{
-			ChatID: params.ChatID,
-			Text:   "Ошибка при создании голосования.",
+	var poll *model.Poll
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		voting := &model.Voting{
+			Title:      params.Options.Title,
+			Type:       params.Options.Type,
+			CreatedBy:  params.Options.CreatedBy,
+			FinishedAt: params.Options.FinishedAt,
+		}
+		if params.Options.MovieID != nil {
+			voting.MovieID = params.Options.MovieID
+		}
+		createdVoting, err := s.repo.CreateVoting(&repository.CreateVotingParams{
+			Voting: voting,
+			Tx:     tx,
 		})
-		return nil, err
-	}
-	pollMsg, err := params.Bot.SendPoll(params.Context, &bot.SendPollParams{
-		ChatID:            params.ChatID,
-		Question:          params.Question,
-		Options:           params.PollOptions,
-		IsAnonymous:       bot.False(),
-		Type:              "regular",
-		QuestionParseMode: models.ParseModeMarkdown,
+		if err != nil {
+			params.Bot.SendMessage(params.Context, &bot.SendMessageParams{
+				ChatID: params.ChatID,
+				Text:   "Ошибка при создании голосования.",
+			})
+			return err
+		}
+		pollMsg, err := params.Bot.SendPoll(params.Context, &bot.SendPollParams{
+			ChatID:            params.ChatID,
+			Question:          params.Question,
+			Options:           params.PollOptions,
+			IsAnonymous:       bot.False(),
+			Type:              "regular",
+			QuestionParseMode: models.ParseModeMarkdown,
+		})
+		if err != nil {
+			log.Printf("Error sending poll: %v", err)
+			return err
+		}
+
+		pollModel := &model.Poll{
+			PollID:    pollMsg.Poll.ID,
+			MessageID: pollMsg.ID,
+			VotingID:  createdVoting.ID,
+			Type:      params.Options.Type,
+			Status:    "active",
+		}
+
+		log.Printf("%s - %d - %d - %s - %s", pollModel.PollID, pollModel.MessageID, pollModel.VotingID, pollModel.Type, pollModel.Status)
+
+		if params.Options.MovieID != nil {
+			pollModel.MovieID = params.Options.MovieID
+		}
+
+		log.Printf("movieID: %v", pollModel.MovieID)
+
+		poll, err = s.pollRepo.Create(&repository.CreatePollParams{
+			Poll: pollModel,
+			Tx:   tx,
+		})
+		if err != nil {
+			log.Printf("Error saving poll: %v", err)
+			return err
+		}
+		return nil
 	})
 	if err != nil {
-		log.Printf("Error sending poll: %v", err)
-		return nil, err
-	}
-	poll, err := s.pollService.CreatePoll(&model.Poll{
-		PollID:    pollMsg.Poll.ID,
-		MessageID: pollMsg.ID,
-		VotingID:  createdVoting.ID,
-		MovieID:   params.Options.MovieID,
-		Type:      "rating",
-		Status:    "active",
-	})
-	if err != nil {
-		log.Printf("Error saving poll: %v", err)
 		return nil, err
 	}
 	return poll, nil

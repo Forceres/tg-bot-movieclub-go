@@ -96,7 +96,7 @@ func (r *MovieRepo) GetAlreadyWatchedMovies() ([]model.Movie, error) {
 
 func (r *MovieRepo) GetSuggestedMovies() ([]model.Movie, error) {
 	var movies []model.Movie
-	if err := r.db.Model(&model.Movie{}).Where(&model.Movie{StartedAt: ""}).Find(&movies).Error; err != nil {
+	if err := r.db.Model(&model.Movie{}).Where(&model.Movie{SuggestedAt: nil}).Find(&movies).Error; err != nil {
 		return nil, err
 	}
 	return movies, nil

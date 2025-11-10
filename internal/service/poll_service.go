@@ -23,7 +23,7 @@ func NewPollService(pollRepo repository.IPollRepo) IPollService {
 }
 
 func (s *PollService) CreatePoll(poll *model.Poll) (*model.Poll, error) {
-	return s.pollRepo.Create(poll)
+	return s.pollRepo.Create(&repository.CreatePollParams{Poll: poll})
 }
 
 func (s *PollService) CreatePollOption(option *model.PollOption) error {

@@ -81,6 +81,10 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 	if err != nil {
 		return err
 	}
+	if count == 0 || movieID == 0 {
+		log.Println("No votes were cast or no movie selected")
+		return nil
+	}
 	log.Printf("Max movie count: %d for movie ID: %d", count, movieID)
 	movie, err := t.movieService.GetMovieByID(movieID)
 	if err != nil {

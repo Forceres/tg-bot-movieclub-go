@@ -11,8 +11,13 @@ type UpdateStatusParams struct {
 	Tx     *gorm.DB
 }
 
+type CreatePollParams struct {
+	Poll *model.Poll
+	Tx   *gorm.DB
+}
+
 type IPollRepo interface {
-	Create(poll *model.Poll) (*model.Poll, error)
+	Create(params *CreatePollParams) (*model.Poll, error)
 	CreatePollOption(option *model.PollOption) error
 	FindByPollID(pollID string) (*model.Poll, error)
 	FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error)
@@ -28,9 +33,13 @@ func NewPollRepository(db *gorm.DB) IPollRepo {
 	return &PollRepo{db: db}
 }
 
-func (r *PollRepo) Create(poll *model.Poll) (*model.Poll, error) {
-	err := r.db.Create(poll).Error
-	return poll, err
+func (r *PollRepo) Create(params *CreatePollParams) (*model.Poll, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	err := tx.Create(params.Poll).Error
+	return params.Poll, err
 }
 
 func (r *PollRepo) CreatePollOption(option *model.PollOption) error {
