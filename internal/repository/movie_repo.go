@@ -17,12 +17,18 @@ type UpdateDatesParams struct {
 	Tx        *gorm.DB
 }
 
+type UpdateParams struct {
+	Movie *model.Movie
+	Tx    *gorm.DB
+}
+
 type IMovieRepo interface {
 	GetCurrentMovies() ([]model.Movie, error)
 	GetAlreadyWatchedMovies() ([]model.Movie, error)
 	GetSuggestedMovies() ([]model.Movie, error)
 	GetMovieByID(id int) (*model.Movie, error)
 	Create(movie *model.Movie) error
+	Update(params *UpdateParams) error
 	UpdateRating(params *UpdateRatingParams) error
 }
 
@@ -36,6 +42,14 @@ func NewMovieRepository(db *gorm.DB) *MovieRepo {
 
 func (r *MovieRepo) Create(movie *model.Movie) error {
 	return r.db.Create(movie).Error
+}
+
+func (r *MovieRepo) Update(params *UpdateParams) error {
+	tx := params.Tx
+	if tx == nil {
+		tx = r.db
+	}
+	return tx.Save(params.Movie).Error
 }
 
 func (r *MovieRepo) UpdateRating(params *UpdateRatingParams) error {

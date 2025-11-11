@@ -6,21 +6,17 @@ import (
 	"log"
 	"time"
 
-	"github.com/go-telegram/bot"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/hibiken/asynq"
 )
 
 const FinishSessionTaskType = "finish_session"
 
-type FinishSessionTaskProcessor struct {
-	b *bot.Bot
-}
-
 type FinishSessionTaskPayload struct {
-	SessionID int
+	SessionID int64
 }
 
-func NewFinishSessionTask(sessionID int) (*asynq.Task, error) {
+func NewFinishSessionTask(sessionID int64) (*asynq.Task, error) {
 	payload, err := json.Marshal(FinishSessionTaskPayload{SessionID: sessionID})
 	if err != nil {
 		return nil, err
@@ -28,28 +24,18 @@ func NewFinishSessionTask(sessionID int) (*asynq.Task, error) {
 	return asynq.NewTask(FinishSessionTaskType, payload), nil
 }
 
-type IFinishSessionTaskProcessor interface {
-	Process() error
-}
-
-func NewFinishSessionTaskProcessor(b *bot.Bot) *FinishSessionTaskProcessor {
-	return &FinishSessionTaskProcessor{
-		b: b,
-	}
-}
-
 type EnqueueFinishSessionParams struct {
-	ChatID   int64
-	Duration int
+	SessionID int64
+	Duration  time.Duration
 }
 
-func EnqueueFinishSessionTask(client *asynq.Client, duration time.Duration, params *FinishSessionTaskPayload) error {
+func EnqueueFinishSessionTask(client *asynq.Client, params *EnqueueFinishSessionParams) error {
 	task, err := NewFinishSessionTask(params.SessionID)
 	if err != nil {
 		log.Printf("Error creating finish session task: %v", err)
 		return err
 	}
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration)}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration)}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling session finish task: %v", err)
@@ -59,6 +45,30 @@ func EnqueueFinishSessionTask(client *asynq.Client, duration time.Duration, para
 	return nil
 }
 
+type FinishSessionTaskProcessor struct {
+	sessionService service.ISessionService
+}
+
+type IFinishSessionTaskProcessor interface {
+	Process() error
+}
+
+func NewFinishSessionTaskProcessor(sessionService service.ISessionService) *FinishSessionTaskProcessor {
+	return &FinishSessionTaskProcessor{
+		sessionService: sessionService,
+	}
+}
+
 func (t *FinishSessionTaskProcessor) Process(ctx context.Context, task *asynq.Task) error {
+	var payload FinishSessionTaskPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		log.Printf("Error unmarshaling finish session task payload: %v", err)
+		return err
+	}
+	err := t.sessionService.FinishSession(payload.SessionID)
+	if err != nil {
+		log.Printf("Error finishing session %d: %v", payload.SessionID, err)
+		return err
+	}
 	return nil
 }
