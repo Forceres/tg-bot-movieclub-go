@@ -4,7 +4,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// Schedule represents a recurring schedule for movie club sessions
 type Schedule struct {
 	gorm.Model
 	ID       int64  `gorm:"primaryKey"`

@@ -26,7 +26,7 @@ func (r *ScheduleRepository) Create(schedule *model.Schedule) (*model.Schedule, 
 
 func (r *ScheduleRepository) FindActive() (*model.Schedule, error) {
 	var schedule *model.Schedule
-	err := r.db.Where("is_active = ?", true).Find(&schedule).Limit(1).Error
+	err := r.db.Where(&model.Schedule{IsActive: true}).Limit(1).Find(&schedule).Error
 	return schedule, err
 }
 

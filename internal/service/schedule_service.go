@@ -14,27 +14,27 @@ type IScheduleService interface {
 }
 
 type ScheduleService struct {
-	scheduleRepo repository.IScheduleRepository
+	repo repository.IScheduleRepository
 }
 
 func NewScheduleService(scheduleRepo repository.IScheduleRepository) IScheduleService {
-	return &ScheduleService{scheduleRepo: scheduleRepo}
+	return &ScheduleService{repo: scheduleRepo}
 }
 
 func (s *ScheduleService) CreateSchedule(schedule *model.Schedule) (*model.Schedule, error) {
-	return s.scheduleRepo.Create(schedule)
+	return s.repo.Create(schedule)
 }
 
 func (s *ScheduleService) GetActiveSchedule() (*model.Schedule, error) {
-	return s.scheduleRepo.FindActive()
+	return s.repo.FindActive()
 }
 
 func (s *ScheduleService) UpdateSchedule(schedule *model.Schedule) error {
-	return s.scheduleRepo.Update(schedule)
+	return s.repo.Update(schedule)
 }
 
 func (s *ScheduleService) GetNextScheduledTime() (int64, error) {
-	schedule, err := s.scheduleRepo.FindActive()
+	schedule, err := s.repo.FindActive()
 	if err != nil || schedule == nil {
 		return 0, err
 	}

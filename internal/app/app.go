@@ -27,6 +27,9 @@ const (
 	stateStartVoting           fsm.StateID = "start_voting"
 	statePrepareCancelIDs      fsm.StateID = "prepare_cancel_ids"
 	stateCancel                fsm.StateID = "cancel"
+	stateDate                  fsm.StateID = "date"
+	stateTime                  fsm.StateID = "time"
+	stateLocation              fsm.StateID = "location"
 )
 
 func PollAnswerMatchFunc() bot.MatchFunc {
@@ -46,6 +49,7 @@ type Handlers struct {
 	CancelVotingHandler         bot.HandlerFunc
 	RegisterUserHandler         bot.HandlerFunc
 	UpdateChatMemberHandler     bot.HandlerFunc
+	ScheduleHandler             bot.HandlerFunc
 }
 
 type Middlewares struct {
@@ -62,6 +66,7 @@ type Services struct {
 	VotingService    service.IVotingService
 	PollService      service.IPollService
 	VoteService      service.IVoteService
+	ScheduleService  service.IScheduleService
 	AsynqClient      *asynq.Client
 }
 
@@ -84,6 +89,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	registerUserHandler := telegram.NewRegisterUserHandler(services.UserService)
 	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
 	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
+	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f)
 
 	handlers := &Handlers{
 		HelpHandler:                 telegram.HelpHandler,
@@ -96,6 +102,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		CancelVotingHandler:         cancelVotingHandler.Handle,
 		RegisterUserHandler:         registerUserHandler.Handle,
 		UpdateChatMemberHandler:     updateChatMemberHandler.Handle,
+		ScheduleHandler:             scheduleHandler.Handle,
 	}
 
 	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
@@ -158,6 +165,7 @@ func LoadServices(cfg *config.Config) *Services {
 		VotingService:    votingService,
 		PollService:      pollService,
 		VoteService:      voteService,
+		ScheduleService:  scheduleService,
 		AsynqClient:      client,
 	}
 
@@ -184,4 +192,5 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel", bot.MatchTypeCommand, handlers.CancelHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_voting", bot.MatchTypeCommand, handlers.CancelVotingHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "register", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
 }

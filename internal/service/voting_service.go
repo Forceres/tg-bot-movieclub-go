@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
@@ -121,15 +120,6 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 			PollID: params.PollID,
 			Status: "closed",
 			Tx:     tx,
-		})
-		if err != nil {
-			return err
-		}
-		startedAt := time.Now().String()
-		err = s.movieRepo.UpdateDates(&repository.UpdateDatesParams{
-			MovieID:   params.MovieID,
-			StartedAt: &startedAt,
-			Tx:        tx,
 		})
 		if err != nil {
 			return err

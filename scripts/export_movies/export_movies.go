@@ -75,8 +75,8 @@ func main() {
 			IMDBRating:  movie.IMDBRating,
 			Rating:      movie.Rating,
 			SuggestedAt: suggestedAt,
+			Status:      "watched",
 			Duration:    movie.Duration,
-			StartedAt:   &movie.StartWatch,  // Map from StartWatch
 			FinishedAt:  &movie.FinishWatch, // Map from FinishWatch
 		})
 	}

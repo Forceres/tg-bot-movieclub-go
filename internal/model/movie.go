@@ -15,7 +15,8 @@ type Movie struct {
 	Duration    int
 	IMDBRating  float64
 	Rating      float64
-	StartedAt   *string `gorm:"default:null"`
+	Status      string  `gorm:"default:'suggested'"`
+	WatchCount  int     `gorm:"default:0"`
 	FinishedAt  *string `gorm:"default:null"`
 	SuggestedAt *int64
 	SuggestedBy *int64    `gorm:"default:null"`

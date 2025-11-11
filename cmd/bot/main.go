@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"net/http"
 	"os"
@@ -45,6 +46,16 @@ const (
 	AllowedUpdateRemovedChatBoost        string = "removed_chat_boost"
 )
 
+var allowedUpdates = []string{
+	AllowedUpdateMessage,
+	AllowedUpdateEditedMessage,
+	AllowedUpdateChannelPost,
+	AllowedUpdateEditedChannelPost,
+	AllowedUpdateCallbackQuery,
+	AllowedUpdatePoll,
+	AllowedUpdatePollAnswer,
+}
+
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -67,15 +78,7 @@ func main() {
 			middlewares.Authentication,
 			middlewares.Log,
 		),
-		bot.WithAllowedUpdates([]string{
-			AllowedUpdateMessage,
-			AllowedUpdateEditedMessage,
-			AllowedUpdateChannelPost,
-			AllowedUpdateEditedChannelPost,
-			AllowedUpdateCallbackQuery,
-			AllowedUpdatePoll,
-			AllowedUpdatePollAnswer,
-		}),
+		bot.WithAllowedUpdates(allowedUpdates),
 	}
 	if nodeEnv == PRODUCTION {
 		err := startWebhook(ctx, opts, cfg, handlers, services)
@@ -108,10 +111,47 @@ func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, ha
 		log.Printf("Failed to create bot: %v", err)
 		return err
 	}
+	// Cleanup function to delete webhook on exit
+	defer func() {
+		log.Println("Deleting webhook...")
+		deleteCtx := context.Background()
+		ok, err := b.DeleteWebhook(deleteCtx, &bot.DeleteWebhookParams{
+			DropPendingUpdates: true,
+		})
+		if err != nil {
+			log.Printf("Failed to delete webhook: %v", err)
+		} else if ok {
+			log.Println("Webhook deleted successfully")
+		}
+	}()
 	app.RegisterHandlers(b, handlers, services, cfg)
+	ok, err := b.SetWebhook(ctx, &bot.SetWebhookParams{
+		URL:                cfg.DomainAddress,
+		DropPendingUpdates: true,
+		SecretToken:        cfg.Telegram.WebhookSecretToken,
+		AllowedUpdates:     allowedUpdates,
+	})
+	if err != nil || !ok {
+		log.Printf("Failed to set webhook: %v", err)
+		return err
+	}
 	go b.StartWebhook(ctx)
-	err = http.ListenAndServe(":2000", b.WebhookHandler())
-	if err != nil {
+	server := &http.Server{
+		Addr:    ":2000",
+		Handler: b.WebhookHandler(),
+	}
+	// Handle graceful shutdown
+	go func() {
+		<-ctx.Done()
+		log.Println("Shutting down webhook server...")
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Error during server shutdown: %v", err)
+		}
+	}()
+	err = server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
 		log.Printf("Failed to start webhook server: %v", err)
 		return err
 	}

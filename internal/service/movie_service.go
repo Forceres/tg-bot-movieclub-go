@@ -155,7 +155,7 @@ func (s *MovieService) generateHTMLForWatchedMovies(movies []model.Movie) []stri
 		if movie.SuggestedBy != nil {
 			suggestedBy = fmt.Sprintf("%d", *movie.SuggestedBy)
 		}
-		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, *movie.StartedAt, suggestedBy, movie.Link))
+		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, *movie.FinishedAt, suggestedBy, movie.Link))
 
 		if (i+1)%ALREADY_WATCHED_MOVIES_PAGE_SIZE == 0 || i == len(movies)-1 {
 			pages = append(pages, html.String())
