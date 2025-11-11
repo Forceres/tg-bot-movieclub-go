@@ -25,8 +25,10 @@ func NewSqliteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	)
 
 	db, err := gorm.Open(sqlite.Open(cfg.Name), &gorm.Config{
-		Logger:      newLogger,
-		PrepareStmt: true,
+		SkipDefaultTransaction: true,
+		TranslateError:         true,
+		Logger:                 newLogger,
+		PrepareStmt:            true,
 	})
 	if err != nil {
 		panic("Failed to connect database")
@@ -42,6 +44,11 @@ func NewSqliteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	db.AutoMigrate(&model.Poll{})
 	db.AutoMigrate(&model.PollOption{})
 	db.AutoMigrate(&model.Schedule{})
+
+	err = db.Exec("PRAGMA foreign_keys = ON").Error
+	if err != nil {
+		panic(err)
+	}
 
 	// Seed data
 	seedRoles(db)
