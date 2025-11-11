@@ -3,6 +3,9 @@ package date
 import (
 	"log"
 	"time"
+
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/datepicker"
+	"github.com/go-telegram/bot"
 )
 
 type GetRelativeDateParams struct {
@@ -64,4 +67,28 @@ func GetRelativeDate(params *GetRelativeDateParams) int64 {
 	targetDate = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), hour, minute, 0, 0, targetDate.Location())
 
 	return targetDate.Unix()
+}
+
+var DatePicker *datepicker.DatePicker
+
+func InitDatePicker(b *bot.Bot, f datepicker.OnCancelHandler, h datepicker.OnSelectHandler) {
+	now := time.Now()
+	year := now.Year()
+	month := now.Month()
+	date := time.Date(year, month, 0, 0, 0, 0, 0, time.UTC)
+	curr := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	curr = curr.AddDate(0, 0, -1)
+	daysToAdd := curr.Day() - 1
+	opts := []datepicker.Option{
+		datepicker.From(date),
+		datepicker.OnCancel(f),
+		datepicker.To(date.AddDate(0, 0, daysToAdd)),
+		datepicker.Language("ru"),
+		datepicker.WithPrefix("datepicker"),
+	}
+	DatePicker = datepicker.New(
+		b,
+		h,
+		opts...,
+	)
 }

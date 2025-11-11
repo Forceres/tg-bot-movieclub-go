@@ -9,6 +9,7 @@ import (
 type IScheduleService interface {
 	CreateSchedule(schedule *model.Schedule) (*model.Schedule, error)
 	GetActiveSchedule() (*model.Schedule, error)
+	ReplaceSchedule(schedule *model.Schedule) (*model.Schedule, error)
 	UpdateSchedule(schedule *model.Schedule) error
 	GetNextScheduledTime() (int64, error)
 }
@@ -23,6 +24,10 @@ func NewScheduleService(scheduleRepo repository.IScheduleRepository) IScheduleSe
 
 func (s *ScheduleService) CreateSchedule(schedule *model.Schedule) (*model.Schedule, error) {
 	return s.repo.Create(schedule)
+}
+
+func (s *ScheduleService) ReplaceSchedule(schedule *model.Schedule) (*model.Schedule, error) {
+	return s.repo.Replace(schedule)
 }
 
 func (s *ScheduleService) GetActiveSchedule() (*model.Schedule, error) {

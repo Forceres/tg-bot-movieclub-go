@@ -5,7 +5,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/date"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
@@ -27,6 +29,12 @@ type ScheduleHandler struct {
 type IScheduleHandler interface {
 	Handle(ctx context.Context, b *bot.Bot, update *models.Update)
 	HandleReschedule(ctx context.Context, b *bot.Bot, update *models.Update)
+	PrepareDate(f *fsm.FSM, args ...any)
+	PrepareTime(f *fsm.FSM, args ...any)
+	PrepareLocation(f *fsm.FSM, args ...any)
+	SaveSchedule(f *fsm.FSM, args ...any)
+	OnDatepickerSelect(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery, date time.Time)
+	OnDatepickerCancel(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery)
 }
 
 func NewScheduleHandler(scheduleService service.IScheduleService, f *fsm.FSM) IScheduleHandler {
@@ -76,9 +84,41 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 	if currentState == stateDefault {
 		return
 	}
-	// ctx := args[1].(context.Context)
-	// b := args[2].(*bot.Bot)
-	// update := args[3].(*models.Update)
+	ctx := args[1].(context.Context)
+	b := args[2].(*bot.Bot)
+	update := args[3].(*models.Update)
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "Изменение расписания...",
+	})
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      update.Message.Chat.ID,
+		Text:        "Выбери дату",
+		ReplyMarkup: date.DatePicker,
+	})
+	if err != nil {
+		log.Printf("Error sending datepicker: %v", err)
+		f.Reset(userID)
+	}
+}
+
+func (h *ScheduleHandler) OnDatepickerCancel(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery) {
+	userID := callbackQuery.From.ID
+	currentState := h.f.Current(userID)
+	if currentState == stateDefault {
+		return
+	}
+	h.f.Reset(userID)
+}
+
+func (h *ScheduleHandler) OnDatepickerSelect(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery, date time.Time) {
+	userID := callbackQuery.From.ID
+	currentState := h.f.Current(userID)
+	if currentState == stateDefault {
+		return
+	}
+	h.f.Set(userID, "date", date)
+	h.f.Transition(userID, stateTime, userID, ctx, b, callbackQuery)
 }
 
 func (h *ScheduleHandler) PrepareTime(f *fsm.FSM, args ...any) {
@@ -87,9 +127,13 @@ func (h *ScheduleHandler) PrepareTime(f *fsm.FSM, args ...any) {
 	if currentState == stateDefault {
 		return
 	}
-	// ctx := args[1].(context.Context)
-	// b := args[2].(*bot.Bot)
-	// update := args[3].(*models.Update)
+	ctx := args[1].(context.Context)
+	b := args[2].(*bot.Bot)
+	callbackQuery := args[3].(*models.CallbackQuery)
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: callbackQuery.Message.Message.Chat.ID,
+		Text:   "Введите время в формате ЧЧ:ММ (например, 18:30)",
+	})
 }
 
 func (h *ScheduleHandler) PrepareLocation(f *fsm.FSM, args ...any) {
@@ -98,9 +142,13 @@ func (h *ScheduleHandler) PrepareLocation(f *fsm.FSM, args ...any) {
 	if currentState == stateDefault {
 		return
 	}
-	// ctx := args[1].(context.Context)
-	// b := args[2].(*bot.Bot)
-	// update := args[3].(*models.Update)
+	ctx := args[1].(context.Context)
+	b := args[2].(*bot.Bot)
+	update := args[3].(*models.Update)
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "Введите локацию (например, Europe/Moscow)",
+	})
 }
 
 func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
@@ -109,7 +157,32 @@ func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
 	if currentState == stateDefault {
 		return
 	}
-	// ctx := args[1].(context.Context)
-	// b := args[2].(*bot.Bot)
-	// update := args[3].(*models.Update)
+	ctx := args[1].(context.Context)
+	b := args[2].(*bot.Bot)
+	update := args[3].(*models.Update)
+	hour, _ := f.Get(userID, "hour")
+	minute, _ := f.Get(userID, "minute")
+	location, _ := f.Get(userID, "location")
+	date, _ := f.Get(userID, "date")
+	schedule := &model.Schedule{
+		Weekday:  int(date.(time.Time).Weekday()) + 1,
+		Hour:     hour.(int),
+		Minute:   minute.(int),
+		IsActive: true,
+		Location: location.(string),
+	}
+	_, err := h.scheduleService.ReplaceSchedule(schedule)
+	if err != nil {
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "Ошибка при сохранении расписания.",
+		})
+		f.Reset(userID)
+		return
+	}
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "Расписание успешно обновлено.",
+	})
+	f.Reset(userID)
 }

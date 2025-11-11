@@ -9,6 +9,7 @@ type IScheduleRepository interface {
 	Create(schedule *model.Schedule) (*model.Schedule, error)
 	FindActive() (*model.Schedule, error)
 	Update(schedule *model.Schedule) error
+	Replace(schedule *model.Schedule) (*model.Schedule, error)
 }
 
 type ScheduleRepository struct {
@@ -22,6 +23,24 @@ func NewScheduleRepository(db *gorm.DB) IScheduleRepository {
 func (r *ScheduleRepository) Create(schedule *model.Schedule) (*model.Schedule, error) {
 	err := r.db.Create(schedule).Error
 	return schedule, err
+}
+
+func (r *ScheduleRepository) Replace(schedule *model.Schedule) (*model.Schedule, error) {
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Schedule{}).Where("is_active = ?", true).Update("is_active", false).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Create(schedule).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return schedule, nil
 }
 
 func (r *ScheduleRepository) FindActive() (*model.Schedule, error) {

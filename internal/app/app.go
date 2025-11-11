@@ -11,6 +11,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/kinopoisk"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/datepicker"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegraph"
 	"github.com/go-telegram/bot"
@@ -30,6 +31,7 @@ const (
 	stateDate                  fsm.StateID = "date"
 	stateTime                  fsm.StateID = "time"
 	stateLocation              fsm.StateID = "location"
+	stateSaveSchedule          fsm.StateID = "save_schedule"
 )
 
 func PollAnswerMatchFunc() bot.MatchFunc {
@@ -50,6 +52,9 @@ type Handlers struct {
 	RegisterUserHandler         bot.HandlerFunc
 	UpdateChatMemberHandler     bot.HandlerFunc
 	ScheduleHandler             bot.HandlerFunc
+	RescheduleHandler           bot.HandlerFunc
+	OnDatepickerSelect          datepicker.OnSelectHandler
+	OnDatepickerCancel          datepicker.OnCancelHandler
 }
 
 type Middlewares struct {
@@ -103,6 +108,9 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		RegisterUserHandler:         registerUserHandler.Handle,
 		UpdateChatMemberHandler:     updateChatMemberHandler.Handle,
 		ScheduleHandler:             scheduleHandler.Handle,
+		RescheduleHandler:           scheduleHandler.HandleReschedule,
+		OnDatepickerSelect:          scheduleHandler.OnDatepickerSelect,
+		OnDatepickerCancel:          scheduleHandler.OnDatepickerCancel,
 	}
 
 	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
@@ -113,6 +121,10 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		stateStartVoting:           votingHandler.StartVoting,
 		stateCancel:                cancelVotingHandler.Cancel,
 		statePrepareCancelIDs:      cancelVotingHandler.PrepareCancelIDs,
+		stateDate:                  scheduleHandler.PrepareDate,
+		stateTime:                  scheduleHandler.PrepareTime,
+		stateLocation:              scheduleHandler.PrepareLocation,
+		stateSaveSchedule:          scheduleHandler.SaveSchedule,
 	})
 
 	middlewares := &Middlewares{
@@ -193,4 +205,5 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_voting", bot.MatchTypeCommand, handlers.CancelVotingHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "register", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "schedule", bot.MatchTypeCommand, handlers.RescheduleHandler, middleware.Delete)
 }
