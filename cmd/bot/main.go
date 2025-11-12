@@ -72,6 +72,7 @@ func main() {
 	)
 	handlers, middlewares, services := app.LoadApp(cfg, f)
 	defer services.AsynqClient.Close()
+	defer services.AsynqInspector.Close()
 	defaultHandler := telegram.NewDefaultHandler(f)
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler.Handle),

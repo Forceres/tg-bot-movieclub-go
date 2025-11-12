@@ -53,6 +53,7 @@ type Handlers struct {
 	UpdateChatMemberHandler     bot.HandlerFunc
 	ScheduleHandler             bot.HandlerFunc
 	RescheduleHandler           bot.HandlerFunc
+	CancelSessionHandler        bot.HandlerFunc
 	OnDatepickerSelect          datepicker.OnSelectHandler
 	OnDatepickerCancel          datepicker.OnCancelHandler
 }
@@ -72,12 +73,12 @@ type Services struct {
 	PollService      service.IPollService
 	VoteService      service.IVoteService
 	ScheduleService  service.IScheduleService
+	SessionService   service.ISessionService
 	AsynqClient      *asynq.Client
+	AsynqInspector   *asynq.Inspector
 }
 
 func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services) {
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
-
 	telegraph, err := telegraph.InitTelegraph()
 	if err != nil {
 		log.Fatalf("Failed to initialize telegraph: %v", err)
@@ -87,7 +88,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 
 	currentMoviesHandler := telegram.NewCurrentMoviesHandler(services.MovieService)
 	alreadyWatchedMoviesHandler := telegram.NewAlreadyWatchedMoviesHandler(services.MovieService, telegraph)
-	votingHandler := telegram.NewVotingHandler(services.MovieService, services.VotingService, services.PollService, services.VoteService, f, client)
+	votingHandler := telegram.NewVotingHandler(services.MovieService, services.VotingService, services.PollService, services.VoteService, f, services.AsynqClient)
 	suggestMovieHandler := telegram.NewSuggestMovieHandler(services.MovieService, services.KinopoiskService)
 	cancelHandler := telegram.NewCancelHandler(f)
 	cancelVotingHandler := telegram.NewCancelVotingHandler(f, services.VotingService)
@@ -95,6 +96,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
 	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
 	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f)
+	cancelSessionHandler := telegram.NewCancelSessionHandler(services.SessionService, services.VotingService, services.AsynqInspector)
 
 	handlers := &Handlers{
 		HelpHandler:                 telegram.HelpHandler,
@@ -109,6 +111,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		UpdateChatMemberHandler:     updateChatMemberHandler.Handle,
 		ScheduleHandler:             scheduleHandler.Handle,
 		RescheduleHandler:           scheduleHandler.HandleReschedule,
+		CancelSessionHandler:        cancelSessionHandler.Handle,
 		OnDatepickerSelect:          scheduleHandler.OnDatepickerSelect,
 		OnDatepickerCancel:          scheduleHandler.OnDatepickerCancel,
 	}
@@ -139,6 +142,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 
 func LoadServices(cfg *config.Config) *Services {
 	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
+	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
 
 	db, err := db.NewSqliteDB(cfg.Database)
 	if err != nil {
@@ -179,6 +183,7 @@ func LoadServices(cfg *config.Config) *Services {
 		VoteService:      voteService,
 		ScheduleService:  scheduleService,
 		AsynqClient:      client,
+		AsynqInspector:   inspector,
 	}
 
 	return services
@@ -196,14 +201,15 @@ func RegisterTaskProcessors(services *Services, b *bot.Bot, mux *asynq.ServeMux)
 func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *config.Config) {
 	b.RegisterHandlerMatchFunc(PollAnswerMatchFunc(), handlers.PollAnswerHandler)
 	b.RegisterHandlerMatchFunc(telegram.UpdateChatMemberMatchFunc(), handlers.UpdateChatMemberHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "help", bot.MatchTypeCommand, handlers.HelpHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "now", bot.MatchTypeCommand, handlers.CurrentMoviesHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "already", bot.MatchTypeCommand, handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "voting", bot.MatchTypeCommand, handlers.VotingHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel", bot.MatchTypeCommand, handlers.CancelHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_voting", bot.MatchTypeCommand, handlers.CancelVotingHandler, middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_session", bot.MatchTypeCommand, handlers.CancelSessionHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "register", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "schedule", bot.MatchTypeCommand, handlers.RescheduleHandler, middleware.Delete)
 }

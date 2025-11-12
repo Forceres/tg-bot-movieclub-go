@@ -24,6 +24,7 @@ type IVotingRepo interface {
 	FindVotingsByStatus(status string) ([]*model.Voting, error)
 	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
 	FinishVoting(params *FinishVotingParams) error
+	FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error)
 }
 
 type VotingRepo struct {
@@ -38,6 +39,14 @@ func NewVotingRepository(db *gorm.DB, pollRepo IPollRepo, movieRepo IMovieRepo) 
 
 func (r *VotingRepo) Transaction(txFunc func(tx *gorm.DB) error) error {
 	return r.db.Transaction(txFunc)
+}
+
+func (r *VotingRepo) FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error) {
+	var votings []*model.Voting
+	if err := r.db.Where(&model.Voting{SessionID: &sessionID}).Find(&votings).Error; err != nil {
+		return nil, err
+	}
+	return votings, nil
 }
 
 func (r *VotingRepo) CreateVoting(params *CreateVotingParams) (*model.Voting, error) {

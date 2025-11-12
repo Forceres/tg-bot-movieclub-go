@@ -27,6 +27,7 @@ type ISessionRepo interface {
 	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, error)
 	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
 	FinishSession(params *FinishSessionParams) (*model.Session, error)
+	CancelSession() (*model.Session, error)
 	Transaction(fc func(tx *gorm.DB) error) error
 }
 
@@ -40,6 +41,15 @@ func NewSessionRepository(db *gorm.DB) ISessionRepo {
 
 func (r *SessionRepo) Transaction(fc func(tx *gorm.DB) error) error {
 	return r.db.Transaction(fc)
+}
+
+func (r *SessionRepo) CancelSession() (*model.Session, error) {
+	var session model.Session
+	err := r.db.Model(&session).Where(&model.Session{Status: "ongoing"}).Clauses(clause.Returning{}).Update("status", "canceled").Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 func (r *SessionRepo) FinishSession(params *FinishSessionParams) (*model.Session, error) {

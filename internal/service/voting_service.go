@@ -51,6 +51,7 @@ type IVotingService interface {
 	FinishRatingVoting(params *FinishRatingVotingParams) error
 	FinishSelectionVoting(params *FinishSelectionVotingParams) (int64, error)
 	StartVoting(params *StartRatingVotingParams) (*model.Poll, error)
+	FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error)
 }
 
 type VotingService struct {
@@ -67,6 +68,10 @@ func NewVotingService(repo repository.IVotingRepo, scheduleService IScheduleServ
 
 func (s *VotingService) CreateVoting(voting *model.Voting) (*model.Voting, error) {
 	return s.repo.CreateVoting(&repository.CreateVotingParams{Voting: voting})
+}
+
+func (s *VotingService) FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error) {
+	return s.repo.FindVotingsBySessionID(sessionID)
 }
 
 func (s *VotingService) FindVotingByID(id int64) (*model.Voting, error) {

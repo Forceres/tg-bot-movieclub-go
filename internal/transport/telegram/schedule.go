@@ -8,6 +8,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/date"
+	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
@@ -87,11 +88,17 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	update := args[3].(*models.Update)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Изменение расписания...",
 	})
-	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+		f.Reset(userID)
+		return
+	}
+	fsmutils.AppendMessageID(f, userID, msg.ID)
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
 		Text:        "Выбери дату",
 		ReplyMarkup: date.DatePicker,
@@ -130,10 +137,16 @@ func (h *ScheduleHandler) PrepareTime(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	callbackQuery := args[3].(*models.CallbackQuery)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: callbackQuery.Message.Message.Chat.ID,
 		Text:   "Введите время в формате ЧЧ:ММ (например, 18:30)",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+		f.Reset(userID)
+		return
+	}
+	fsmutils.AppendMessageID(f, userID, msg.ID)
 }
 
 func (h *ScheduleHandler) PrepareLocation(f *fsm.FSM, args ...any) {
@@ -145,10 +158,16 @@ func (h *ScheduleHandler) PrepareLocation(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	update := args[3].(*models.Update)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Введите локацию (например, Europe/Moscow)",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+		f.Reset(userID)
+		return
+	}
+	fsmutils.AppendMessageID(f, userID, msg.ID)
 }
 
 func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
@@ -184,5 +203,6 @@ func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
 		ChatID: update.Message.Chat.ID,
 		Text:   "Расписание успешно обновлено.",
 	})
+	fsmutils.DeleteMessages(ctx, b, f, userID, update.Message.Chat.ID)
 	f.Reset(userID)
 }

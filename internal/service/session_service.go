@@ -3,12 +3,14 @@ package service
 import (
 	"time"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
 	"gorm.io/gorm"
 )
 
 type ISessionService interface {
 	FinishSession(sessionID int64) error
+	CancelSession() (*model.Session, error)
 }
 
 type SessionService struct {
@@ -18,6 +20,10 @@ type SessionService struct {
 
 func NewSessionService(repo repository.ISessionRepo, movieRepo repository.IMovieRepo) ISessionService {
 	return &SessionService{repo: repo, movieRepo: movieRepo}
+}
+
+func (s *SessionService) CancelSession() (*model.Session, error) {
+	return s.repo.CancelSession()
 }
 
 func (s *SessionService) FinishSession(sessionID int64) error {
