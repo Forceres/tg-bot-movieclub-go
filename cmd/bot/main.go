@@ -12,7 +12,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/date"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/datepicker"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/fsm"
 )
@@ -101,7 +101,8 @@ func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config
 		log.Printf("Failed to create bot: %v", err)
 		return err
 	}
-	date.InitDatePicker(b, handlers.OnDatepickerCancel, handlers.OnDatepickerSelect)
+	datepicker.ScheduleDatepicker(b, services.ScheduleDatepicker)
+	datepicker.SessionDatepicker(b, services.SessionDatepicker)
 	app.RegisterHandlers(b, handlers, services, cfg)
 	b.Start(ctx)
 	return nil
@@ -127,7 +128,8 @@ func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, ha
 			log.Println("Webhook deleted successfully")
 		}
 	}()
-	date.InitDatePicker(b, handlers.OnDatepickerCancel, handlers.OnDatepickerSelect)
+	datepicker.ScheduleDatepicker(b, services.ScheduleDatepicker)
+	datepicker.SessionDatepicker(b, services.SessionDatepicker)
 	app.RegisterHandlers(b, handlers, services, cfg)
 	ok, err := b.SetWebhook(ctx, &bot.SetWebhookParams{
 		URL:                cfg.DomainAddress,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/date"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/datepicker"
 	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -25,6 +25,7 @@ const (
 type ScheduleHandler struct {
 	f               *fsm.FSM
 	scheduleService service.IScheduleService
+	datepicker      *datepicker.Datepicker
 }
 
 type IScheduleHandler interface {
@@ -34,12 +35,10 @@ type IScheduleHandler interface {
 	PrepareTime(f *fsm.FSM, args ...any)
 	PrepareLocation(f *fsm.FSM, args ...any)
 	SaveSchedule(f *fsm.FSM, args ...any)
-	OnDatepickerSelect(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery, date time.Time)
-	OnDatepickerCancel(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery)
 }
 
-func NewScheduleHandler(scheduleService service.IScheduleService, f *fsm.FSM) IScheduleHandler {
-	return &ScheduleHandler{scheduleService: scheduleService, f: f}
+func NewScheduleHandler(scheduleService service.IScheduleService, f *fsm.FSM, datepicker *datepicker.Datepicker) IScheduleHandler {
+	return &ScheduleHandler{scheduleService: scheduleService, f: f, datepicker: datepicker}
 }
 
 func (h *ScheduleHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -76,6 +75,10 @@ func (h *ScheduleHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 
 func (h *ScheduleHandler) HandleReschedule(ctx context.Context, b *bot.Bot, update *models.Update) {
 	userID := update.Message.From.ID
+	currentState := h.f.Current(userID)
+	if currentState != stateDefault {
+		return
+	}
 	h.f.Transition(userID, stateDate, userID, ctx, b, update)
 }
 
@@ -101,31 +104,12 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
 		Text:        "Выбери дату",
-		ReplyMarkup: date.DatePicker,
+		ReplyMarkup: h.datepicker.Datepicker,
 	})
 	if err != nil {
 		log.Printf("Error sending datepicker: %v", err)
 		f.Reset(userID)
 	}
-}
-
-func (h *ScheduleHandler) OnDatepickerCancel(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery) {
-	userID := callbackQuery.From.ID
-	currentState := h.f.Current(userID)
-	if currentState == stateDefault {
-		return
-	}
-	h.f.Reset(userID)
-}
-
-func (h *ScheduleHandler) OnDatepickerSelect(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery, date time.Time) {
-	userID := callbackQuery.From.ID
-	currentState := h.f.Current(userID)
-	if currentState == stateDefault {
-		return
-	}
-	h.f.Set(userID, "date", date)
-	h.f.Transition(userID, stateTime, userID, ctx, b, callbackQuery)
 }
 
 func (h *ScheduleHandler) PrepareTime(f *fsm.FSM, args ...any) {

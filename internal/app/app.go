@@ -10,8 +10,8 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/datepicker"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/kinopoisk"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/datepicker"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegraph"
 	"github.com/go-telegram/bot"
@@ -54,9 +54,8 @@ type Handlers struct {
 	ScheduleHandler             bot.HandlerFunc
 	RescheduleHandler           bot.HandlerFunc
 	CancelSessionHandler        bot.HandlerFunc
-	OnDatepickerSelect          datepicker.OnSelectHandler
-	OnDatepickerCancel          datepicker.OnCancelHandler
 	AddsMovieHandler            bot.HandlerFunc
+	RescheduleSessionHandler    bot.HandlerFunc
 }
 
 type Middlewares struct {
@@ -67,16 +66,18 @@ type Middlewares struct {
 }
 
 type Services struct {
-	UserService      service.IUserService
-	MovieService     service.IMovieService
-	KinopoiskService service.IKinopoiskService
-	VotingService    service.IVotingService
-	PollService      service.IPollService
-	VoteService      service.IVoteService
-	ScheduleService  service.IScheduleService
-	SessionService   service.ISessionService
-	AsynqClient      *asynq.Client
-	AsynqInspector   *asynq.Inspector
+	UserService        service.IUserService
+	MovieService       service.IMovieService
+	KinopoiskService   service.IKinopoiskService
+	VotingService      service.IVotingService
+	PollService        service.IPollService
+	VoteService        service.IVoteService
+	ScheduleService    service.IScheduleService
+	SessionService     service.ISessionService
+	AsynqClient        *asynq.Client
+	AsynqInspector     *asynq.Inspector
+	ScheduleDatepicker *datepicker.Datepicker
+	SessionDatepicker  *datepicker.Datepicker
 }
 
 func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services) {
@@ -87,6 +88,12 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 
 	services := LoadServices(cfg)
 
+	sessionDatepicker := datepicker.NewDatepicker(f)
+	scheduleDatepicker := datepicker.NewDatepicker(f)
+
+	services.SessionDatepicker = sessionDatepicker
+	services.ScheduleDatepicker = scheduleDatepicker
+
 	currentMoviesHandler := telegram.NewCurrentMoviesHandler(services.MovieService)
 	alreadyWatchedMoviesHandler := telegram.NewAlreadyWatchedMoviesHandler(services.MovieService, telegraph)
 	votingHandler := telegram.NewVotingHandler(services.MovieService, services.VotingService, services.PollService, services.VoteService, f, services.AsynqClient)
@@ -96,9 +103,10 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	registerUserHandler := telegram.NewRegisterUserHandler(services.UserService)
 	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
 	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
-	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f)
+	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f, services.ScheduleDatepicker)
 	cancelSessionHandler := telegram.NewCancelSessionHandler(services.SessionService, services.VotingService, services.AsynqInspector)
 	addsMovieHandler := &telegram.AddsMovieHandler{}
+	rescheduleSessionHandler := telegram.NewResheduleSessionHandler(f, services.SessionDatepicker)
 
 	handlers := &Handlers{
 		HelpHandler:                 telegram.HelpHandler,
@@ -114,9 +122,8 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		ScheduleHandler:             scheduleHandler.Handle,
 		RescheduleHandler:           scheduleHandler.HandleReschedule,
 		CancelSessionHandler:        cancelSessionHandler.Handle,
-		OnDatepickerSelect:          scheduleHandler.OnDatepickerSelect,
-		OnDatepickerCancel:          scheduleHandler.OnDatepickerCancel,
 		AddsMovieHandler:            addsMovieHandler.Handle,
+		RescheduleSessionHandler:    rescheduleSessionHandler.Handle,
 	}
 
 	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
