@@ -2,6 +2,11 @@ package model
 
 import "gorm.io/gorm"
 
+const (
+	POLL_OPENED_STATUS = "opened"
+	POLL_CLOSED_STATUS = "closed"
+)
+
 type Poll struct {
 	gorm.Model
 	ID        int64  `gorm:"primaryKey"`

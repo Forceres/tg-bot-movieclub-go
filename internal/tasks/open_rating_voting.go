@@ -29,13 +29,6 @@ var RATING_VOTING_OPTIONS = []models.InputPollOption{
 	{Text: "10"},
 }
 
-type OpenRatingVotingTaskProcessor struct {
-	b             *bot.Bot
-	votingService service.IVotingService
-	movieService  service.IMovieService
-	asynqClient   *asynq.Client
-}
-
 type OpenRatingVotingPayload struct {
 	PollID    string      `json:"poll_id"`
 	MessageID int         `json:"message_id"`
@@ -51,6 +44,39 @@ func NewOpenRatingVotingTask(pollID string, messageID int, chatID int64, votingI
 		return nil, err
 	}
 	return asynq.NewTask(OpenRatingVotingTaskType, payload), nil
+}
+
+type EnqueueOpenRatingVotingParams struct {
+	PollID    string      `json:"poll_id"`
+	MessageID int         `json:"message_id"`
+	ChatID    int64       `json:"chat_id"`
+	VotingID  int64       `json:"voting_id"`
+	Movie     model.Movie `json:"movie"`
+	UserID    int64       `json:"user_id"`
+	Duration  time.Duration
+}
+
+func EnqueueOpenRatingVotingTask(client *asynq.Client, params *EnqueueOpenRatingVotingParams) error {
+	task, err := NewOpenRatingVotingTask(params.PollID, params.MessageID, params.ChatID, params.VotingID, params.Movie)
+	if err != nil {
+		log.Printf("Error creating finish session task: %v", err)
+		return err
+	}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(fmt.Sprintln(params.VotingID))}
+	taskInfo, err := client.Enqueue(task, scheduleOpts...)
+	if err != nil {
+		log.Printf("Error scheduling session finish task: %v", err)
+		return err
+	}
+	log.Printf("Scheduled session finish task: %s", taskInfo.ID)
+	return nil
+}
+
+type OpenRatingVotingTaskProcessor struct {
+	b             *bot.Bot
+	votingService service.IVotingService
+	movieService  service.IMovieService
+	asynqClient   *asynq.Client
 }
 
 type IOpenRatingVotingTaskProcessor interface {
@@ -79,7 +105,7 @@ func (t *OpenRatingVotingTaskProcessor) Process(ctx context.Context, task *asynq
 		ChatID:  p.ChatID,
 		Options: service.VotingOptions{
 			Title:      fmt.Sprintf("Оцените фильм: %s", p.Movie.Title),
-			Type:       "rating",
+			Type:       model.VOTING_RATING_TYPE,
 			CreatedBy:  p.UserID,
 			FinishedAt: &finishedAt,
 			MovieID:    &p.Movie.ID,

@@ -2,6 +2,11 @@ package model
 
 import "gorm.io/gorm"
 
+const (
+	MOVIE_SUGGESTED_STATUS = "suggested"
+	MOVIE_WATCHED_STATUS   = "watched"
+)
+
 type Movie struct {
 	gorm.Model
 	ID          int

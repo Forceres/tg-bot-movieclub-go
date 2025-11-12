@@ -21,7 +21,6 @@ type IPollRepo interface {
 	CreatePollOption(option *model.PollOption) error
 	FindByPollID(pollID string) (*model.Poll, error)
 	FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error)
-	FindActivePolls() ([]model.Poll, error)
 	UpdateStatus(params *UpdateStatusParams) error
 }
 
@@ -48,7 +47,7 @@ func (r *PollRepo) CreatePollOption(option *model.PollOption) error {
 
 func (r *PollRepo) FindByPollID(pollID string) (*model.Poll, error) {
 	var poll *model.Poll
-	err := r.db.Model(&model.Poll{}).Preload("Voting").Preload("Movie").Where("poll_id = ? AND status = ?", pollID, "active").First(&poll).Error
+	err := r.db.Model(&model.Poll{}).Preload("Voting").Preload("Movie").Where("poll_id = ? AND status = ?", pollID, model.POLL_OPENED_STATUS).First(&poll).Error
 	return poll, err
 }
 
@@ -56,12 +55,6 @@ func (r *PollRepo) FindPollOptionsByPollID(pollID int64) ([]model.PollOption, er
 	var options []model.PollOption
 	err := r.db.Preload("Movie").Where("poll_id = ?", pollID).Order("option_index").Find(&options).Error
 	return options, err
-}
-
-func (r *PollRepo) FindActivePolls() ([]model.Poll, error) {
-	var polls []model.Poll
-	err := r.db.Preload("Voting").Preload("Movie").Where("status = ?", "active").Find(&polls).Error
-	return polls, err
 }
 
 func (r *PollRepo) UpdateStatus(params *UpdateStatusParams) error {

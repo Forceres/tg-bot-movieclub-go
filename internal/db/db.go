@@ -59,8 +59,8 @@ func NewSqliteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 
 func seedRoles(db *gorm.DB) {
 	roles := []model.Role{
-		{Name: "ADMIN"},
-		{Name: "USER"},
+		{Name: model.ROLE_ADMIN},
+		{Name: model.ROLE_USER},
 	}
 
 	for _, role := range roles {

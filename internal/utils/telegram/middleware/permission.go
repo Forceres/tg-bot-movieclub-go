@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -130,7 +131,7 @@ func CheckIfAdmin(ctx context.Context, b *bot.Bot, update *models.Update, groupI
 		}
 		return false
 	}
-	if user.Role.Name == "ADMIN" {
+	if user.Role.Name == model.ROLE_ADMIN {
 		return true
 	}
 

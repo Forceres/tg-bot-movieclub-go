@@ -2,6 +2,14 @@ package model
 
 import "gorm.io/gorm"
 
+const (
+	VOTING_ACTIVE_STATUS    = "ACTIVE"
+	VOTING_INACTIVE_STATUS  = "INACTIVE"
+	VOTING_CANCELLED_STATUS = "CANCELLED"
+	VOTING_RATING_TYPE      = "rating"
+	VOTING_SELECTION_TYPE   = "selection"
+)
+
 type Voting struct {
 	gorm.Model
 	ID         int64  `gorm:"primaryKey"`

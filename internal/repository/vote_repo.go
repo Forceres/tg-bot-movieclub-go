@@ -7,7 +7,6 @@ import (
 
 type IVoteRepo interface {
 	Create(vote *model.Vote) error
-	FindVotesByVotingID(id int64) (*model.Vote, error)
 	CalculateRatingMean(votingID int64) (float64, error)
 	CalculateMaxMovieCount(votingID int64) (int64, int, error)
 }
@@ -57,12 +56,4 @@ func (r *VoteRepo) CalculateRatingMean(votingID int64) (float64, error) {
 		return 0, err
 	}
 	return result.Mean, nil
-}
-
-func (r *VoteRepo) FindVotesByVotingID(id int64) (*model.Vote, error) {
-	var vote model.Vote
-	if err := r.db.First(&vote, "voting_id = ?", id).Error; err != nil {
-		return nil, err
-	}
-	return &vote, nil
 }

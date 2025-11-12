@@ -2,6 +2,11 @@ package model
 
 import "gorm.io/gorm"
 
+const (
+	ROLE_USER  = "USER"
+	ROLE_ADMIN = "ADMIN"
+)
+
 type Role struct {
 	gorm.Model
 	ID   int64

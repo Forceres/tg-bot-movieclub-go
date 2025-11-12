@@ -29,6 +29,10 @@ func (h *PollAnswerHandler) Handle(ctx context.Context, b *bot.Bot, update *mode
 		log.Printf("Poll not found: %s", update.PollAnswer.PollID)
 		return
 	}
+	if poll != nil && poll.Status == model.POLL_CLOSED_STATUS {
+		log.Printf("Poll is closed: %s", update.PollAnswer.PollID)
+		return
+	}
 
 	log.Printf("User %d voted in poll %s (type: %s)\n",
 		update.PollAnswer.User.ID,

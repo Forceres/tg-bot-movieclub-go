@@ -2,6 +2,12 @@ package model
 
 import "gorm.io/gorm"
 
+const (
+	SESSION_ONGOING_STATUS   = "ONGOING"
+	SESSION_FINISHED_STATUS  = "FINISHED"
+	SESSION_CANCELLED_STATUS = "CANCELLED"
+)
+
 type Session struct {
 	gorm.Model
 	ID         int64 `gorm:"primaryKey"`

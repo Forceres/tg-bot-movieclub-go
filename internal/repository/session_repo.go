@@ -45,7 +45,7 @@ func (r *SessionRepo) Transaction(fc func(tx *gorm.DB) error) error {
 
 func (r *SessionRepo) CancelSession() (*model.Session, error) {
 	var session model.Session
-	err := r.db.Model(&session).Where(&model.Session{Status: "ongoing"}).Clauses(clause.Returning{}).Update("status", "canceled").Error
+	err := r.db.Model(&session).Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Clauses(clause.Returning{}).Update("status", model.SESSION_CANCELLED_STATUS).Error
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (r *SessionRepo) FinishSession(params *FinishSessionParams) (*model.Session
 	}
 	sessionID := params.SessionID
 	session := &model.Session{ID: sessionID}
-	err := tx.Model(session).Clauses(clause.Returning{}).Update("status", "finished").Error
+	err := tx.Model(session).Clauses(clause.Returning{}).Update("status", model.SESSION_FINISHED_STATUS).Error
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*m
 	if params.Tx != nil {
 		tx = params.Tx
 	}
-	err := tx.Where("status = ?", "ongoing").Attrs(&model.Session{Status: "ongoing", CreatedBy: params.CreatedBy, FinishedAt: *params.FinishedAt}).FirstOrCreate(&session).Error
+	err := tx.Where("status = ?", model.SESSION_ONGOING_STATUS).Attrs(&model.Session{Status: model.SESSION_ONGOING_STATUS, CreatedBy: params.CreatedBy, FinishedAt: *params.FinishedAt}).FirstOrCreate(&session).Error
 	if err != nil {
 		return nil, err
 	}
