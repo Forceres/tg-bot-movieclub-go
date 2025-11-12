@@ -51,15 +51,12 @@ type Handlers struct {
 	CancelVotingHandler         bot.HandlerFunc
 	RegisterUserHandler         bot.HandlerFunc
 	UpdateChatMemberHandler     bot.HandlerFunc
-<<<<<<< HEAD
 	ScheduleHandler             bot.HandlerFunc
 	RescheduleHandler           bot.HandlerFunc
 	CancelSessionHandler        bot.HandlerFunc
 	OnDatepickerSelect          datepicker.OnSelectHandler
 	OnDatepickerCancel          datepicker.OnCancelHandler
-=======
 	AddsMovieHandler            bot.HandlerFunc
->>>>>>> 33a95f5 (feat: Add AddsMovieHandler with boilerplate)
 }
 
 type Middlewares struct {
@@ -99,12 +96,9 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	registerUserHandler := telegram.NewRegisterUserHandler(services.UserService)
 	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
 	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
-<<<<<<< HEAD
 	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f)
 	cancelSessionHandler := telegram.NewCancelSessionHandler(services.SessionService, services.VotingService, services.AsynqInspector)
-=======
 	addsMovieHandler := &telegram.AddsMovieHandler{}
->>>>>>> 33a95f5 (feat: Add AddsMovieHandler with boilerplate)
 
 	handlers := &Handlers{
 		HelpHandler:                 telegram.HelpHandler,
@@ -117,15 +111,12 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		CancelVotingHandler:         cancelVotingHandler.Handle,
 		RegisterUserHandler:         registerUserHandler.Handle,
 		UpdateChatMemberHandler:     updateChatMemberHandler.Handle,
-<<<<<<< HEAD
 		ScheduleHandler:             scheduleHandler.Handle,
 		RescheduleHandler:           scheduleHandler.HandleReschedule,
 		CancelSessionHandler:        cancelSessionHandler.Handle,
 		OnDatepickerSelect:          scheduleHandler.OnDatepickerSelect,
 		OnDatepickerCancel:          scheduleHandler.OnDatepickerCancel,
-=======
 		AddsMovieHandler:            addsMovieHandler.Handle,
->>>>>>> 33a95f5 (feat: Add AddsMovieHandler with boilerplate)
 	}
 
 	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
@@ -223,9 +214,6 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_voting", bot.MatchTypeCommand, handlers.CancelVotingHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_session", bot.MatchTypeCommand, handlers.CancelSessionHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "register", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
-<<<<<<< HEAD
 	b.RegisterHandler(bot.HandlerTypeMessageText, "schedule", bot.MatchTypeCommand, handlers.RescheduleHandler, middleware.Delete)
-=======
 	b.RegisterHandler(bot.HandlerTypeMessageText, "adds", bot.MatchTypeCommand, handlers.AddsMovieHandler, middleware.Delete)
->>>>>>> 33a95f5 (feat: Add AddsMovieHandler with boilerplate)
 }
