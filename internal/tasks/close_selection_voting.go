@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -55,7 +56,7 @@ func EnqueueCloseSelectionVotingTask(client *asynq.Client, duration time.Duratio
 		log.Printf("Error creating close selection voting task: %v", err)
 		return err
 	}
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration)}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration), asynq.TaskID(fmt.Sprintln(params.VotingID))}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling voting end task: %v", err)

@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -64,7 +65,7 @@ func EnqueueCloseRatingVotingTask(client *asynq.Client, duration time.Duration, 
 		return err
 	}
 	// seconds
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration)}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration), asynq.TaskID(fmt.Sprintln(params.VotingID))}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling voting end task: %v", err)

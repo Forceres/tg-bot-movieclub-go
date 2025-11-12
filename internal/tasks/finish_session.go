@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -35,7 +36,7 @@ func EnqueueFinishSessionTask(client *asynq.Client, params *EnqueueFinishSession
 		log.Printf("Error creating finish session task: %v", err)
 		return err
 	}
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration)}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(fmt.Sprintln(params.SessionID))}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling session finish task: %v", err)
