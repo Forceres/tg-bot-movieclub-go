@@ -44,9 +44,9 @@ func (r *ScheduleRepository) Replace(schedule *model.Schedule) (*model.Schedule,
 }
 
 func (r *ScheduleRepository) FindActive() (*model.Schedule, error) {
-	var schedule *model.Schedule
+	var schedule model.Schedule
 	err := r.db.Where(&model.Schedule{IsActive: true}).Limit(1).Find(&schedule).Error
-	return schedule, err
+	return &schedule, err
 }
 
 func (r *ScheduleRepository) Update(schedule *model.Schedule) error {

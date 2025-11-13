@@ -28,6 +28,8 @@ type ISessionRepo interface {
 	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
 	FinishSession(params *FinishSessionParams) (*model.Session, error)
 	CancelSession() (*model.Session, error)
+	FindOngoingSession() (*model.Session, error)
+	RescheduleSession(sessionID int64, finishedAt int64) error
 	Transaction(fc func(tx *gorm.DB) error) error
 }
 
@@ -41,6 +43,19 @@ func NewSessionRepository(db *gorm.DB) ISessionRepo {
 
 func (r *SessionRepo) Transaction(fc func(tx *gorm.DB) error) error {
 	return r.db.Transaction(fc)
+}
+
+func (r *SessionRepo) RescheduleSession(sessionID int64, finishedAt int64) error {
+	return r.db.Model(&model.Session{ID: sessionID}).Update("finished_at", finishedAt).Error
+}
+
+func (r *SessionRepo) FindOngoingSession() (*model.Session, error) {
+	var session model.Session
+	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 func (r *SessionRepo) CancelSession() (*model.Session, error) {
@@ -67,7 +82,7 @@ func (r *SessionRepo) FinishSession(params *FinishSessionParams) (*model.Session
 }
 
 func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, error) {
-	var session *model.Session
+	var session model.Session
 	var tx *gorm.DB = r.db
 	if params.Tx != nil {
 		tx = params.Tx
@@ -76,7 +91,7 @@ func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*m
 	if err != nil {
 		return nil, err
 	}
-	return session, nil
+	return &session, nil
 }
 
 func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error {
@@ -84,8 +99,7 @@ func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParam
 	if params.Tx != nil {
 		tx = params.Tx
 	}
-
-	var movies []model.Movie
+	var movies []*model.Movie
 	if err := tx.Where("id IN ?", params.MovieIDs).Find(&movies).Error; err != nil {
 		return err
 	}

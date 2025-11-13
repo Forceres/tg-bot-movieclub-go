@@ -18,9 +18,9 @@ func NewRoleRepository(db *gorm.DB) IRoleRepo {
 }
 
 func (r *RoleRepo) FindByName(name string) (*model.Role, error) {
-	var role *model.Role
+	var role model.Role
 	if err := r.db.Where(&model.Role{Name: name}).Find(&role).Error; err != nil {
 		return nil, err
 	}
-	return role, nil
+	return &role, nil
 }

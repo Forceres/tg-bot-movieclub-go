@@ -8,7 +8,7 @@ import (
 type IPollService interface {
 	CreatePollOption(option *model.PollOption) error
 	GetPollByPollID(pollID string) (*model.Poll, error)
-	GetPollOptionsByPollID(pollID int64) ([]model.PollOption, error)
+	GetPollOptionsByPollID(pollID int64) ([]*model.PollOption, error)
 }
 
 type PollService struct {
@@ -27,6 +27,6 @@ func (s *PollService) GetPollByPollID(pollID string) (*model.Poll, error) {
 	return s.pollRepo.FindByPollID(pollID)
 }
 
-func (s *PollService) GetPollOptionsByPollID(pollID int64) ([]model.PollOption, error) {
+func (s *PollService) GetPollOptionsByPollID(pollID int64) ([]*model.PollOption, error) {
 	return s.pollRepo.FindPollOptionsByPollID(pollID)
 }

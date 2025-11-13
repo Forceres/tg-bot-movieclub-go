@@ -53,6 +53,7 @@ type EnqueueOpenRatingVotingParams struct {
 	VotingID  int64       `json:"voting_id"`
 	Movie     model.Movie `json:"movie"`
 	UserID    int64       `json:"user_id"`
+	TaskID    string      `json:"task_id"`
 	Duration  time.Duration
 }
 
@@ -62,7 +63,7 @@ func EnqueueOpenRatingVotingTask(client *asynq.Client, params *EnqueueOpenRating
 		log.Printf("Error creating finish session task: %v", err)
 		return err
 	}
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(fmt.Sprintln(params.VotingID))}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(params.TaskID)}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling session finish task: %v", err)

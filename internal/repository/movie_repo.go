@@ -23,9 +23,9 @@ type UpdateParams struct {
 }
 
 type IMovieRepo interface {
-	GetCurrentMovies() ([]model.Movie, error)
-	GetAlreadyWatchedMovies() ([]model.Movie, error)
-	GetSuggestedMovies() ([]model.Movie, error)
+	GetCurrentMovies() ([]*model.Movie, error)
+	GetAlreadyWatchedMovies() ([]*model.Movie, error)
+	GetSuggestedMovies() ([]*model.Movie, error)
 	GetMovieByID(id int) (*model.Movie, error)
 	Create(movie *model.Movie) error
 	Update(params *UpdateParams) error
@@ -68,8 +68,8 @@ func (r *MovieRepo) GetMovieByID(id int) (*model.Movie, error) {
 	return &movie, nil
 }
 
-func (r *MovieRepo) GetCurrentMovies() ([]model.Movie, error) {
-	var movies []model.Movie
+func (r *MovieRepo) GetCurrentMovies() ([]*model.Movie, error) {
+	var movies []*model.Movie
 
 	sub := r.db.Model(&model.Session{}).
 		Select("movies_sessions.session_id").
@@ -83,16 +83,16 @@ func (r *MovieRepo) GetCurrentMovies() ([]model.Movie, error) {
 	return movies, nil
 }
 
-func (r *MovieRepo) GetAlreadyWatchedMovies() ([]model.Movie, error) {
-	var movies []model.Movie
+func (r *MovieRepo) GetAlreadyWatchedMovies() ([]*model.Movie, error) {
+	var movies []*model.Movie
 	if err := r.db.Model(&model.Movie{}).Where("watch_count > 0").Find(&movies).Error; err != nil {
 		return nil, err
 	}
 	return movies, nil
 }
 
-func (r *MovieRepo) GetSuggestedMovies() ([]model.Movie, error) {
-	var movies []model.Movie
+func (r *MovieRepo) GetSuggestedMovies() ([]*model.Movie, error) {
+	var movies []*model.Movie
 	if err := r.db.Model(&model.Movie{}).Where(&model.Movie{Status: model.MOVIE_SUGGESTED_STATUS}).Find(&movies).Error; err != nil {
 		return nil, err
 	}

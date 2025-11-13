@@ -23,9 +23,9 @@ func (r *UserRepo) CreateIfNotExist(user *model.User) error {
 }
 
 func (r *UserRepo) FindByID(userID int64) (*model.User, error) {
-	var user *model.User
+	var user model.User
 	if err := r.db.Where(&model.User{ID: userID}).Preload("Role").First(&user).Error; err != nil {
 		return nil, err
 	}
-	return user, nil
+	return &user, nil
 }
