@@ -105,7 +105,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
 	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f, services.ScheduleDatepicker)
 	cancelSessionHandler := telegram.NewCancelSessionHandler(services.SessionService, services.VotingService, services.AsynqInspector)
-	addsMovieHandler := &telegram.AddsMovieHandler{}
+	addsMovieHandler := telegram.NewAddsMovieHandler(services.MovieService, services.KinopoiskService, services.SessionService, services.PollService, services.AsynqClient, services.AsynqInspector)
 	rescheduleSessionHandler := telegram.NewResheduleSessionHandler(f, services.SessionDatepicker)
 
 	handlers := &Handlers{
@@ -169,6 +169,7 @@ func LoadServices(cfg *config.Config) *Services {
 	scheduleService := service.NewScheduleService(scheduleRepo)
 
 	sessionRepo := repository.NewSessionRepository(db)
+	sessionService := service.NewSessionService(sessionRepo, movieRepo, scheduleService)
 
 	votingRepo := repository.NewVotingRepository(db, pollRepo, movieRepo)
 	votingService := service.NewVotingService(votingRepo, scheduleService, sessionRepo, movieRepo, pollRepo)
@@ -192,6 +193,7 @@ func LoadServices(cfg *config.Config) *Services {
 		PollService:      pollService,
 		VoteService:      voteService,
 		ScheduleService:  scheduleService,
+		SessionService:   sessionService,
 		AsynqClient:      client,
 		AsynqInspector:   inspector,
 	}

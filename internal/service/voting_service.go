@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
@@ -123,13 +124,22 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 		if err != nil {
 			return err
 		}
-		session, err := s.sessionRepo.FindOrCreateSession(&repository.FindOrCreateSessionParams{
-			CreatedBy:  params.CreatedBy,
-			FinishedAt: &finishedAt,
-			Tx:         tx,
-		})
+		session, err := s.sessionRepo.GetOngoingSession(tx)
 		if err != nil {
-			return err
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			session, err = s.sessionRepo.Create(&repository.CreateSessionParams{
+				Session: &model.Session{
+					Status:     model.SESSION_ONGOING_STATUS,
+					CreatedBy:  params.CreatedBy,
+					FinishedAt: finishedAt,
+				},
+				Tx: tx,
+			})
+			if err != nil {
+				return err
+			}
 		}
 		err = s.sessionRepo.ConnectMoviesToSession(&repository.ConnectMoviesToSessionParams{
 			SessionID: session.ID,

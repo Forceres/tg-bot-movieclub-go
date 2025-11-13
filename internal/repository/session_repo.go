@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -12,10 +14,9 @@ type ConnectMoviesToSessionParams struct {
 	Tx        *gorm.DB
 }
 
-type FindOrCreateSessionParams struct {
-	CreatedBy  int64
-	FinishedAt *int64
-	Tx         *gorm.DB
+type CreateSessionParams struct {
+	Session *model.Session
+	Tx      *gorm.DB
 }
 
 type FinishSessionParams struct {
@@ -24,7 +25,8 @@ type FinishSessionParams struct {
 }
 
 type ISessionRepo interface {
-	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, error)
+	GetOngoingSession(tx *gorm.DB) (*model.Session, error)
+	Create(params *CreateSessionParams) (*model.Session, error)
 	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
 	FinishSession(params *FinishSessionParams) (*model.Session, error)
 	CancelSession() (*model.Session, error)
@@ -66,17 +68,30 @@ func (r *SessionRepo) FinishSession(params *FinishSessionParams) (*model.Session
 	return session, nil
 }
 
-func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, error) {
-	var session *model.Session
-	var tx *gorm.DB = r.db
-	if params.Tx != nil {
-		tx = params.Tx
+func (r *SessionRepo) GetOngoingSession(tx *gorm.DB) (*model.Session, error) {
+	db := r.db
+	if tx != nil {
+		db = tx
 	}
-	err := tx.Where("status = ?", model.SESSION_ONGOING_STATUS).Attrs(&model.Session{Status: model.SESSION_ONGOING_STATUS, CreatedBy: params.CreatedBy, FinishedAt: *params.FinishedAt}).FirstOrCreate(&session).Error
-	if err != nil {
+	var session model.Session
+	if err := db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).First(&session).Error; err != nil {
 		return nil, err
 	}
-	return session, nil
+	return &session, nil
+}
+
+func (r *SessionRepo) Create(params *CreateSessionParams) (*model.Session, error) {
+	db := r.db
+	if params.Tx != nil {
+		db = params.Tx
+	}
+	if params.Session == nil {
+		return nil, errors.New("session is required")
+	}
+	if err := db.Create(params.Session).Error; err != nil {
+		return nil, err
+	}
+	return params.Session, nil
 }
 
 func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error {

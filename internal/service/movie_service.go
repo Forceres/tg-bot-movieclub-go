@@ -55,7 +55,7 @@ func NewMovieService(repo repository.IMovieRepo) *MovieService {
 func (s *MovieService) Create(movie *MovieDTO, suggestedBy int64) error {
 	suggestedAt := time.Now().Unix()
 	newMovie := model.Movie{
-		ID:          0,
+		ID:          movie.KinopoiskID,
 		Title:       movie.Title,
 		Description: movie.Description,
 		Directors:   strings.Join(movie.Directors, ", "),
