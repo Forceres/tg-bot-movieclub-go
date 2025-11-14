@@ -226,7 +226,7 @@ func (h *AddsMovieHandler) activeTaskSet(prefix, taskType string) (map[string]st
 	for _, task := range activeTasks {
 		id := strings.TrimSpace(task.ID)
 		if id == "" {
-			id = task.ID
+			continue
 		}
 		ids = append(ids, id)
 		set[id] = struct{}{}
