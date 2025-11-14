@@ -38,3 +38,11 @@ go.work
 Thumbs.db
 db.sqlite3
 dev.sqlite3
+
+# Docker
+*.log
+ssl/
+backups/
+
+# Docker volumes data
+data/

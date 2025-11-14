@@ -3,6 +3,7 @@ package app
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
@@ -151,8 +152,14 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 }
 
 func LoadServices(cfg *config.Config) *Services {
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
+	nodeEnv := os.Getenv("NODE_ENV")
+	redisClientOpts := asynq.RedisClientOpt{Addr: cfg.Redis.URL}
+	if nodeEnv == "PRODUCTION" {
+		redisClientOpts.Password = cfg.Redis.Password
+	}
+
+	client := asynq.NewClient(redisClientOpts)
+	inspector := asynq.NewInspector(redisClientOpts)
 
 	db, err := db.NewSqliteDB(cfg.Database)
 	if err != nil {
