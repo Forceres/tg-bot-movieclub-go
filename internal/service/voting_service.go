@@ -132,20 +132,7 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 			Tx:         tx,
 		})
 		if err != nil {
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				return err
-			}
-			session, err = s.sessionRepo.Create(&repository.CreateSessionParams{
-				Session: &model.Session{
-					Status:     model.SESSION_ONGOING_STATUS,
-					CreatedBy:  params.CreatedBy,
-					FinishedAt: finishedAt,
-				},
-				Tx: tx,
-			})
-			if err != nil {
-				return err
-			}
+			return err
 		}
 		err = s.sessionRepo.ConnectMoviesToSession(&repository.ConnectMoviesToSessionParams{
 			SessionID: session.ID,
