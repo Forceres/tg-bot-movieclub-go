@@ -99,7 +99,7 @@ func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*m
 	var created bool = false
 	var tx *gorm.DB = r.db
 	if params.Tx != nil {
-		db = params.Tx
+		tx = params.Tx
 	}
 	err := tx.Where("status = ?", model.SESSION_ONGOING_STATUS).Attrs(&model.Session{Status: model.SESSION_ONGOING_STATUS, CreatedBy: params.CreatedBy, FinishedAt: *params.FinishedAt}).FirstOrCreate(&session).Error
 	if session.CreatedAt.Equal(session.UpdatedAt) {
