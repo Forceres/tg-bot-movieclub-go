@@ -3,6 +3,7 @@ package repository
 import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UpdateRatingParams struct {
@@ -30,6 +31,7 @@ type IMovieRepo interface {
 	Create(movie *model.Movie) error
 	Update(params *UpdateParams) error
 	UpdateRating(params *UpdateRatingParams) error
+	Upsert(movie *model.Movie) error
 }
 
 type MovieRepo struct {
@@ -42,6 +44,12 @@ func NewMovieRepository(db *gorm.DB) *MovieRepo {
 
 func (r *MovieRepo) Create(movie *model.Movie) error {
 	return r.db.Create(movie).Error
+}
+
+func (r *MovieRepo) Upsert(movie *model.Movie) error {
+	return r.db.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&movie).Error
 }
 
 func (r *MovieRepo) Update(params *UpdateParams) error {
@@ -72,7 +80,7 @@ func (r *MovieRepo) GetCurrentMovies() ([]*model.Movie, error) {
 	var movies []*model.Movie
 
 	sub := r.db.Model(&model.Session{}).
-		Select("movies_sessions.session_id").
+		Select("movies_sessions.movie_id").
 		Joins("JOIN movies_sessions ON movies_sessions.session_id = sessions.id").
 		Where(&model.Session{Status: model.SESSION_ONGOING_STATUS})
 
