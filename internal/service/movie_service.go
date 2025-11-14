@@ -41,6 +41,7 @@ type IMovieService interface {
 	GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error)
 	GetMovieByID(id int) (*model.Movie, error)
 	Create(movie *MovieDTO, suggestedBy int64) error
+	Upsert(movie *MovieDTO, suggestedBy int64) error
 	generateHTMLForWatchedMovies(movies []*model.Movie) []string
 }
 
@@ -50,6 +51,25 @@ type MovieService struct {
 
 func NewMovieService(repo repository.IMovieRepo) *MovieService {
 	return &MovieService{repo: repo}
+}
+
+func (s *MovieService) Upsert(movie *MovieDTO, suggestedBy int64) error {
+	suggestedAt := time.Now().Unix()
+	newMovie := model.Movie{
+		ID:          movie.KinopoiskID,
+		Title:       movie.Title,
+		Description: movie.Description,
+		Directors:   strings.Join(movie.Directors, ", "),
+		Year:        movie.Year,
+		Countries:   strings.Join(movie.Countries, ", "),
+		Genres:      strings.Join(movie.Genres, ", "),
+		Link:        movie.Link,
+		Duration:    movie.Duration,
+		IMDBRating:  movie.IMDBRating,
+		SuggestedBy: &suggestedBy,
+		SuggestedAt: &suggestedAt,
+	}
+	return s.repo.Upsert(&newMovie)
 }
 
 func (s *MovieService) Create(movie *MovieDTO, suggestedBy int64) error {
