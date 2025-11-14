@@ -7,6 +7,7 @@ import (
 )
 
 type MovieDTO struct {
+	KinopoiskID int      `json:"kinopoisk_id"`
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Directors   []string `json:"director"`
@@ -47,6 +48,7 @@ func (s *KinopoiskService) ParseMovies(response *[]kinopoisk.KinopoiskMovieWithS
 	var moviesDto []MovieDTO
 	for _, item := range *response {
 		var movieDto MovieDTO
+		movieDto.KinopoiskID = item.Movie.KinopoiskID
 		movieDto.Link = fmt.Sprintf("https://www.kinopoisk.ru/film/%d/", item.Movie.KinopoiskID)
 		for _, person := range *item.Staff {
 			if person.ProfessionKey == "DIRECTOR" {

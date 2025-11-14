@@ -1,6 +1,7 @@
 package repository
 
 import (
+
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -12,10 +13,9 @@ type ConnectMoviesToSessionParams struct {
 	Tx        *gorm.DB
 }
 
-type FindOrCreateSessionParams struct {
-	CreatedBy  int64
-	FinishedAt *int64
-	Tx         *gorm.DB
+type CreateSessionParams struct {
+	Session *model.Session
+	Tx      *gorm.DB
 }
 
 type FinishSessionParams struct {
@@ -24,6 +24,7 @@ type FinishSessionParams struct {
 }
 
 type ISessionRepo interface {
+	GetOngoingSession(tx *gorm.DB) (*model.Session, error)
 	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error)
 	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
 	FinishSession(params *FinishSessionParams) (*model.Session, error)
@@ -79,6 +80,18 @@ func (r *SessionRepo) FinishSession(params *FinishSessionParams) (*model.Session
 		return nil, err
 	}
 	return session, nil
+}
+
+func (r *SessionRepo) GetOngoingSession(tx *gorm.DB) (*model.Session, error) {
+	db := r.db
+	if tx != nil {
+		db = tx
+	}
+	var session model.Session
+	if err := db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).First(&session).Error; err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error) {
