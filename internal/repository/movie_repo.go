@@ -74,7 +74,7 @@ func (r *MovieRepo) GetCurrentMovies() ([]*model.Movie, error) {
 	sub := r.db.Model(&model.Session{}).
 		Select("movies_sessions.session_id").
 		Joins("JOIN movies_sessions ON movies_sessions.session_id = sessions.id").
-		Where(&model.Session{Status: "ACTIVE"})
+		Where(&model.Session{Status: model.SESSION_ONGOING_STATUS})
 
 	if err := r.db.Model(&model.Movie{}).Where("id IN (?)", sub).Find(&movies).Error; err != nil {
 		return nil, err
