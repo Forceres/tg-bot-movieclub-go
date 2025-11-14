@@ -25,7 +25,7 @@ type KinopoiskMovie struct {
 	KinopoiskID                int       `json:"kinopoiskId"`
 	KinopoiskHDID              string    `json:"kinopoiskHDId"`
 	ImdbID                     string    `json:"imdbId"`
-	NameRu                     string    `json:"nameRu"`
+	NameRu                     *string   `json:"nameRu"`
 	NameEn                     string    `json:"nameEn"`
 	NameOriginal               string    `json:"nameOriginal"`
 	PosterURL                  string    `json:"posterUrl"`

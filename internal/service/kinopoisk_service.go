@@ -56,9 +56,10 @@ func (s *KinopoiskService) ParseMovies(response *[]kinopoisk.KinopoiskMovieWithS
 			}
 		}
 		movieDto.Description = item.Movie.Description
-		movieDto.Title = item.Movie.NameRu
-		if movieDto.Title == "" {
+		if item.Movie.NameRu == nil {
 			movieDto.Title = item.Movie.NameOriginal
+		} else {
+			movieDto.Title = *item.Movie.NameRu
 		}
 		for _, country := range item.Movie.Countries {
 			movieDto.Countries = append(movieDto.Countries, country.Country)
