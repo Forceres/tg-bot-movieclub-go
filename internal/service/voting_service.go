@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"

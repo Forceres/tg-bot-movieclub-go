@@ -1,7 +1,6 @@
 package repository
 
 import (
-
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -11,6 +10,12 @@ type ConnectMoviesToSessionParams struct {
 	SessionID int64
 	MovieIDs  []int
 	Tx        *gorm.DB
+}
+
+type FindOrCreateSessionParams struct {
+	CreatedBy  int64
+	FinishedAt *int64
+	Tx         *gorm.DB
 }
 
 type CreateSessionParams struct {
@@ -32,6 +37,7 @@ type ISessionRepo interface {
 	FindOngoingSession() (*model.Session, error)
 	RescheduleSession(sessionID int64, finishedAt int64) error
 	Transaction(fc func(tx *gorm.DB) error) error
+	Create(params *CreateSessionParams) (*model.Session, error)
 }
 
 type SessionRepo struct {
@@ -128,4 +134,13 @@ func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParam
 		return err
 	}
 	return nil
+}
+
+func (r *SessionRepo) Create(params *CreateSessionParams) (*model.Session, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	err := tx.Create(params.Session).Error
+	return params.Session, err
 }
