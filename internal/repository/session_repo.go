@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"errors"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
