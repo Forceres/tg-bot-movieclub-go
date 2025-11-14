@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"log"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
@@ -37,10 +38,13 @@ func (h *RegisterUserHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 		Username:  user.Username,
 	}, role)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Произошла ошибка при регистрации пользователя.",
 		})
+		if err != nil {
+			log.Printf("Error sending error message: %v", err)
+		}
 		return
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{

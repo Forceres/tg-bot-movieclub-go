@@ -41,17 +41,12 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 		}
 		return
 	}
-	activeTasks, err := h.inspector.ListActiveTasks(tasks.FinishSessionTaskType)
+	taskId := fmt.Sprintf("%s-%d", tasks.FinishSessionTaskType, session.ID)
+	_, err = h.inspector.GetTaskInfo(tasks.QUEUE, taskId)
 	if err != nil {
-		log.Printf("Error listing active tasks: %v", err)
+		log.Printf("Error getting finish session task info: %v", err)
 	}
-	var finishSessionTask *asynq.TaskInfo
-	for _, t := range activeTasks {
-		if t.ID == fmt.Sprint(session.ID) {
-			finishSessionTask = t
-		}
-	}
-	err = h.inspector.DeleteTask(tasks.FinishSessionTaskType, finishSessionTask.ID)
+	err = h.inspector.DeleteTask(tasks.QUEUE, taskId)
 	if err != nil {
 		log.Printf("Error deleting finish session task: %v", err)
 	}
@@ -61,21 +56,12 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 	}
 	for _, voting := range votings {
 		if voting.Status == "ongoing" {
-			activeTasks, err = h.inspector.ListActiveTasks(tasks.CloseRatingVotingTaskType)
+			taskInfo, err := h.inspector.GetTaskInfo(tasks.QUEUE, fmt.Sprintf("%s-%d", tasks.CloseRatingVotingTaskType, voting.ID))
 			if err != nil {
-				log.Printf("Error listing active tasks: %v", err)
+				log.Printf("Error getting task with id: %s, %v", taskInfo.ID, err)
 				continue
 			}
-			var closeVotingTask *asynq.TaskInfo
-			for _, t := range activeTasks {
-				if t.ID == fmt.Sprint(voting.ID) {
-					closeVotingTask = t
-				}
-			}
-			if closeVotingTask == nil {
-				continue
-			}
-			err = h.inspector.DeleteTask(tasks.CloseRatingVotingTaskType, closeVotingTask.ID)
+			err = h.inspector.DeleteTask(tasks.QUEUE, taskInfo.ID)
 			if err != nil {
 				log.Printf("Error deleting close voting task: %v", err)
 			}

@@ -130,10 +130,13 @@ func (h *ResheduleSessionHandler) RescheduleSession(f *fsm.FSM, args ...any) {
 	session, err := h.sessionService.FindOngoingSession()
 	if err != nil {
 		log.Printf("Error finding ongoing session: %v", err)
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Нет текущей сессии просмотра.",
 		})
+		if err != nil {
+			log.Printf("Error sending error message: %v", err)
+		}
 		f.Reset(userID)
 		return
 	}
@@ -145,77 +148,65 @@ func (h *ResheduleSessionHandler) RescheduleSession(f *fsm.FSM, args ...any) {
 	err = h.sessionService.RescheduleSession(session.ID, finishedAt)
 	if err != nil {
 		log.Printf("Error rescheduling session: %v", err)
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Ошибка при обновлении сессии просмотра.",
 		})
+		if err != nil {
+			log.Printf("Error sending error message: %v", err)
+		}
 		f.Reset(userID)
 		return
 	}
-	activeTasks, err := h.inspector.ListActiveTasks(tasks.FinishSessionTaskType)
+	taskId := fmt.Sprintf("%s-%d", tasks.FinishSessionTaskType, session.ID)
+	_, err = h.inspector.GetTaskInfo(tasks.QUEUE, taskId)
 	if err != nil {
-		log.Printf("Error listing active tasks: %v", err)
+		log.Printf("Error getting task info: %v", err)
 	}
-	for _, t := range activeTasks {
-		var p tasks.FinishSessionTaskPayload
-		if err := json.Unmarshal(t.Payload, &p); err != nil {
-			log.Printf("Error unmarshaling task payload: %v", err)
-			continue
-		}
-		if p.SessionID == session.ID {
-			if err := h.inspector.DeleteTask(tasks.FinishSessionTaskType, t.ID); err != nil {
-				log.Printf("Error deleting task: %v", err)
-			} else {
-				log.Printf("Deleted scheduled finish session task: %s", t.ID)
-			}
-			break
-		}
+	if err := h.inspector.DeleteTask(tasks.QUEUE, taskId); err != nil {
+		log.Printf("Error deleting task: %v", err)
+	} else {
+		log.Printf("Deleted scheduled finish session task: %s", taskId)
 	}
 	err = tasks.EnqueueFinishSessionTask(h.client, &tasks.EnqueueFinishSessionParams{
 		SessionID: session.ID,
-		Duration:  time.Duration(finishedAt),
+		Duration:  time.Duration(finishedAt) - time.Duration(time.Now().Unix()),
 	})
 	if err != nil {
 		log.Printf("Error scheduling new finish session task: %v", err)
 	} else {
 		log.Printf("Scheduled new finish session task for session: %d", session.ID)
 	}
-	activeTasks, err = h.inspector.ListActiveTasks(tasks.OpenRatingVotingTaskType)
-	if err != nil {
-		log.Printf("Error listing active tasks: %v", err)
+	taskIds := make([]string, 0)
+	for _, movie := range session.Movies {
+		taskIds = append(taskIds, fmt.Sprintf("%s-%d-%d", tasks.OpenRatingVotingTaskType, session.ID, movie.ID))
 	}
 	openRatingVotingTasks := make([]*asynq.TaskInfo, 0)
-	for idx, t := range activeTasks {
-		var p tasks.OpenRatingVotingPayload
-		if err := json.Unmarshal(t.Payload, &p); err != nil {
-			log.Printf("Error unmarshaling task payload: %v", err)
-			continue
+	for _, tId := range taskIds {
+		taskInfo, err := h.inspector.GetTaskInfo(tasks.QUEUE, taskId)
+		if err != nil {
+			log.Printf("Error getting task info: %v", err)
 		}
-		if t.ID == fmt.Sprintf("%d-%d", session.ID, idx) {
-			openRatingVotingTasks = append(openRatingVotingTasks, t)
-			if err := h.inspector.DeleteTask(tasks.OpenRatingVotingTaskType, t.ID); err != nil {
-				log.Printf("Error deleting task: %v", err)
-			} else {
-				log.Printf("Deleted scheduled open rating voting task: %s", t.ID)
-			}
-			break
+		openRatingVotingTasks = append(openRatingVotingTasks, taskInfo)
+		if err := h.inspector.DeleteTask(tasks.QUEUE, tId); err != nil {
+			log.Printf("Error deleting task: %v", err)
+		} else {
+			log.Printf("Deleted scheduled open rating voting task: %s", tId)
 		}
 	}
-	for idx, t := range openRatingVotingTasks {
+	for _, t := range openRatingVotingTasks {
 		var p tasks.OpenRatingVotingPayload
 		if err := json.Unmarshal(t.Payload, &p); err != nil {
 			log.Printf("Error unmarshaling task payload: %v", err)
 			continue
 		}
 		err := tasks.EnqueueOpenRatingVotingTask(h.client, &tasks.EnqueueOpenRatingVotingParams{
-			PollID:    p.PollID,
-			MessageID: p.MessageID,
 			ChatID:    p.ChatID,
-			VotingID:  p.VotingID,
+			SessionID: session.ID,
 			Movie:     p.Movie,
 			UserID:    p.UserID,
-			TaskID:    fmt.Sprintf("%d-%d", session.ID, idx),
-			Duration:  time.Duration(finishedAt),
+			TaskID:    t.ID,
+			Duration:  time.Duration(finishedAt) - time.Duration(time.Now().Unix()),
 		})
 		if err != nil {
 			log.Printf("Error scheduling new open rating voting task: %v", err)

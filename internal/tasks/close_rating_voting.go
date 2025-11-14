@@ -65,7 +65,7 @@ func EnqueueCloseRatingVotingTask(client *asynq.Client, duration time.Duration, 
 		return err
 	}
 	// seconds
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration), asynq.TaskID(fmt.Sprintln(params.VotingID))}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration), asynq.TaskID(fmt.Sprintf("%s-%d", CloseRatingVotingTaskType, params.VotingID)), asynq.Queue(QUEUE)}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling voting end task: %v", err)
@@ -110,7 +110,7 @@ func (t *CloseRatingVotingTaskProcessor) Process(ctx context.Context, task *asyn
 		Text: "Голосование завершено!\n" +
 			"Фильм для просмотра: 🎬\n" +
 			"<b>" + movie.Title + "</b>\n" +
-			"Средний рейтинг: ⭐️ " + strconv.FormatFloat(mean, 'f', 2, 64),
+			"Средний рейтинг: 🔥 " + strconv.FormatFloat(mean, 'f', 2, 64),
 		ParseMode: "HTML",
 	})
 	if err != nil {

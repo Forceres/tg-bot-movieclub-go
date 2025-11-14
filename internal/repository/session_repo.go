@@ -24,7 +24,7 @@ type FinishSessionParams struct {
 }
 
 type ISessionRepo interface {
-	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, error)
+	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error)
 	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
 	FinishSession(params *FinishSessionParams) (*model.Session, error)
 	CancelSession() (*model.Session, error)
@@ -51,7 +51,7 @@ func (r *SessionRepo) RescheduleSession(sessionID int64, finishedAt int64) error
 
 func (r *SessionRepo) FindOngoingSession() (*model.Session, error) {
 	var session model.Session
-	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).First(&session).Error
+	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Preload("Movies").First(&session).Error
 	if err != nil {
 		return nil, err
 	}
@@ -81,17 +81,21 @@ func (r *SessionRepo) FinishSession(params *FinishSessionParams) (*model.Session
 	return session, nil
 }
 
-func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, error) {
+func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error) {
 	var session model.Session
+	var created bool = false
 	var tx *gorm.DB = r.db
 	if params.Tx != nil {
 		tx = params.Tx
 	}
 	err := tx.Where("status = ?", model.SESSION_ONGOING_STATUS).Attrs(&model.Session{Status: model.SESSION_ONGOING_STATUS, CreatedBy: params.CreatedBy, FinishedAt: *params.FinishedAt}).FirstOrCreate(&session).Error
-	if err != nil {
-		return nil, err
+	if session.CreatedAt.Equal(session.UpdatedAt) {
+		created = true
 	}
-	return &session, nil
+	if err != nil {
+		return nil, false, err
+	}
+	return &session, created, nil
 }
 
 func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error {

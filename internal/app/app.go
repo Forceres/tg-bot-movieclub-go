@@ -208,11 +208,13 @@ func LoadServices(cfg *config.Config) *Services {
 
 func RegisterTaskProcessors(services *Services, b *bot.Bot, mux *asynq.ServeMux) {
 	closeRatingVotingProcessor := tasks.NewCloseRatingVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
-	closeSelectionVotingProcessor := tasks.NewCloseSelectionVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
+	closeSelectionVotingProcessor := tasks.NewCloseSelectionVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService, services.AsynqInspector, services.AsynqClient)
 	openRatingVotingProcessor := tasks.NewOpenRatingVotingTaskProcessor(b, services.VotingService, services.MovieService, services.AsynqClient)
+	finishSessionProcessor := tasks.NewFinishSessionTaskProcessor(services.SessionService)
 	mux.HandleFunc(tasks.CloseRatingVotingTaskType, closeRatingVotingProcessor.Process)
 	mux.HandleFunc(tasks.CloseSelectionVotingTaskType, closeSelectionVotingProcessor.Process)
 	mux.HandleFunc(tasks.OpenRatingVotingTaskType, openRatingVotingProcessor.Process)
+	mux.HandleFunc(tasks.FinishSessionTaskType, finishSessionProcessor.Process)
 }
 
 func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *config.Config) {

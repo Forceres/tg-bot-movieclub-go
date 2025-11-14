@@ -30,16 +30,14 @@ var RATING_VOTING_OPTIONS = []models.InputPollOption{
 }
 
 type OpenRatingVotingPayload struct {
-	PollID    string      `json:"poll_id"`
-	MessageID int         `json:"message_id"`
 	ChatID    int64       `json:"chat_id"`
-	VotingID  int64       `json:"voting_id"`
+	SessionID int64       `json:"session_id"`
 	Movie     model.Movie `json:"movie"`
 	UserID    int64       `json:"user_id"`
 }
 
-func NewOpenRatingVotingTask(pollID string, messageID int, chatID int64, votingID int64, movie model.Movie) (*asynq.Task, error) {
-	payload, err := json.Marshal(OpenRatingVotingPayload{PollID: pollID, MessageID: messageID, ChatID: chatID, VotingID: votingID, Movie: movie})
+func NewOpenRatingVotingTask(chatID int64, sessionID int64, movie model.Movie, userID int64) (*asynq.Task, error) {
+	payload, err := json.Marshal(OpenRatingVotingPayload{ChatID: chatID, SessionID: sessionID, Movie: movie, UserID: userID})
 	if err != nil {
 		return nil, err
 	}
@@ -47,10 +45,8 @@ func NewOpenRatingVotingTask(pollID string, messageID int, chatID int64, votingI
 }
 
 type EnqueueOpenRatingVotingParams struct {
-	PollID    string      `json:"poll_id"`
-	MessageID int         `json:"message_id"`
+	SessionID int64       `json:"session_id"`
 	ChatID    int64       `json:"chat_id"`
-	VotingID  int64       `json:"voting_id"`
 	Movie     model.Movie `json:"movie"`
 	UserID    int64       `json:"user_id"`
 	TaskID    string      `json:"task_id"`
@@ -58,12 +54,12 @@ type EnqueueOpenRatingVotingParams struct {
 }
 
 func EnqueueOpenRatingVotingTask(client *asynq.Client, params *EnqueueOpenRatingVotingParams) error {
-	task, err := NewOpenRatingVotingTask(params.PollID, params.MessageID, params.ChatID, params.VotingID, params.Movie)
+	task, err := NewOpenRatingVotingTask(params.ChatID, params.SessionID, params.Movie, params.UserID)
 	if err != nil {
 		log.Printf("Error creating finish session task: %v", err)
 		return err
 	}
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(params.TaskID)}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(params.TaskID), asynq.Queue(QUEUE)}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling session finish task: %v", err)
@@ -100,19 +96,20 @@ func (t *OpenRatingVotingTaskProcessor) Process(ctx context.Context, task *asynq
 	}
 	duration := time.Duration(15) * time.Minute
 	finishedAt := time.Now().Add(duration).Unix()
+	title := fmt.Sprintf("Оцените фильм: %s", p.Movie.Title)
 	poll, err := t.votingService.StartVoting(&service.StartRatingVotingParams{
 		Bot:     t.b,
 		Context: ctx,
 		ChatID:  p.ChatID,
 		Options: service.VotingOptions{
-			Title:      fmt.Sprintf("Оцените фильм: %s", p.Movie.Title),
+			Title:      title,
 			Type:       model.VOTING_RATING_TYPE,
 			CreatedBy:  p.UserID,
 			FinishedAt: &finishedAt,
 			MovieID:    &p.Movie.ID,
 		},
 		PollOptions: RATING_VOTING_OPTIONS,
-		Question:    fmt.Sprintf("Оцените фильм: %s", p.Movie.Title),
+		Question:    title,
 	})
 	if err != nil {
 		log.Printf("Error while starting a voting: %v", err)

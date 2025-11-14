@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"log"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/go-telegram/bot"
@@ -23,15 +24,21 @@ func NewCurrentMoviesHandler(movieService service.IMovieService) *CurrentMoviesH
 func (h *CurrentMoviesHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	movies, err := h.movieService.GetCurrentMovies()
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Мы пока ничего не смотрим!",
 		})
+		if err != nil {
+			log.Printf("Error sending the message: %v", err)
+		}
 		return
 	}
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:    update.Message.Chat.ID,
 		Text:      *movies,
 		ParseMode: models.ParseModeHTML,
 	})
+	if err != nil {
+		log.Printf("Error sending the message: %v", err)
+	}
 }

@@ -13,6 +13,7 @@ type ISessionService interface {
 	CancelSession() (*model.Session, error)
 	FindOngoingSession() (*model.Session, error)
 	RescheduleSession(sessionID int64, finishedAt int64) error
+	FindOrCreateSession(finishedAt int64, createdAt int64) (*model.Session, bool, error)
 }
 
 type SessionService struct {
@@ -22,6 +23,13 @@ type SessionService struct {
 
 func NewSessionService(repo repository.ISessionRepo, movieRepo repository.IMovieRepo) ISessionService {
 	return &SessionService{repo: repo, movieRepo: movieRepo}
+}
+
+func (s *SessionService) FindOrCreateSession(finishedAt int64, createdAt int64) (*model.Session, bool, error) {
+	return s.repo.FindOrCreateSession(&repository.FindOrCreateSessionParams{
+		CreatedBy:  createdAt,
+		FinishedAt: &finishedAt,
+	})
 }
 
 func (s *SessionService) RescheduleSession(sessionID int64, finishedAt int64) error {

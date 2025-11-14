@@ -84,11 +84,14 @@ func (h *VotingHandler) PrepareVotingType(f *fsm.FSM, args ...any) {
 		Button("Оценка фильма", []byte(RATING_TYPE), h.onInlineKeyboardSelect).
 		Row().
 		Button("Отменить", []byte("cancel"), h.onCancelSelect)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
 		Text:        "Выбери тип голосования",
 		ReplyMarkup: kb,
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }
 
 func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, update *models.Update, data []byte) {
@@ -100,24 +103,33 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 	selection := string(data)
 	switch selection {
 	case SELECTION_TYPE:
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "Вы выбрали 'Выбор фильма'. Начинаем процесс выбора фильма.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		h.fsm.Set(userID, "type", selection)
 		h.fsm.Transition(userID, statePrepareVotingTitle, userID, ctx, b, update)
 	case RATING_TYPE:
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "Вы выбрали 'Оценка фильма'. Начинаем процесс оценки фильма.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		h.fsm.Set(userID, "type", selection)
-		h.fsm.Transition(userID, statePrepareVotingTitle, userID, ctx, b, update)
+		h.fsm.Transition(userID, statePrepareMovies, userID, ctx, b, update)
 	default:
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "Неизвестный выбор.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		h.fsm.Reset(userID)
 	}
 }
@@ -131,10 +143,13 @@ func (h *VotingHandler) PrepareVotingTitle(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	update := args[3].(*models.Update)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 		Text:   "Введите название для голосования!",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }
 
 func (h *VotingHandler) PrepareVotingDuration(f *fsm.FSM, args ...any) {
@@ -146,10 +161,13 @@ func (h *VotingHandler) PrepareVotingDuration(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	update := args[3].(*models.Update)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Введите длительность голосования (в часах)",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }
 
 func (h *VotingHandler) onCancelSelect(ctx context.Context, b *bot.Bot, update *models.Update, data []byte) {
@@ -159,10 +177,13 @@ func (h *VotingHandler) onCancelSelect(ctx context.Context, b *bot.Bot, update *
 		return
 	}
 	h.fsm.Reset(userID)
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 		Text:   "Отменено.",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }
 
 func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
@@ -185,10 +206,13 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 		movies, err = h.movieService.GetSuggestedOrWatchedMovies(false)
 	}
 	if err != nil || len(movies) == 0 {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Увы фильмов нет.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		f.Reset(userID)
 		return
 	}
@@ -205,17 +229,23 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	_, err = p.Show(ctx, b, update.Message.Chat.ID, showOpts...)
 	if err != nil {
 		log.Printf("Error showing paginator: %v", err)
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Ошибка при показе пагинатора.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		f.Reset(userID)
 		return
 	}
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Перечисли номера фильмов, которые должны быть оценены через запятую",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }
 
 func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
@@ -300,19 +330,20 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				continue
 			}
 			movieID, _ := strconv.Atoi((*movieData)[0])
+			title := fmt.Sprintf("Оцените фильм: %s", (*movieData)[1])
 			poll, err := h.votingService.StartVoting(&service.StartRatingVotingParams{
 				Bot:     b,
 				Context: ctx,
 				ChatID:  update.Message.Chat.ID,
 				Options: service.VotingOptions{
-					Title:      title.(string),
+					Title:      title,
 					Type:       votingType.(string),
 					CreatedBy:  userID,
 					FinishedAt: &finishedAt,
 					MovieID:    &movieID,
 				},
 				PollOptions: RATING_VOTING_OPTIONS,
-				Question:    fmt.Sprintf("Оцените фильм: %s", (*movieData)[1]),
+				Question:    title,
 			})
 			if err != nil {
 				log.Printf("Error while starting a voting: %v", err)

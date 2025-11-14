@@ -36,7 +36,7 @@ func EnqueueFinishSessionTask(client *asynq.Client, params *EnqueueFinishSession
 		log.Printf("Error creating finish session task: %v", err)
 		return err
 	}
-	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(fmt.Sprintln(params.SessionID))}
+	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(params.Duration), asynq.TaskID(fmt.Sprintf("%s-%d", FinishSessionTaskType, params.SessionID)), asynq.Queue(QUEUE)}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {
 		log.Printf("Error scheduling session finish task: %v", err)

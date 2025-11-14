@@ -44,10 +44,13 @@ func NewScheduleHandler(scheduleService service.IScheduleService, f *fsm.FSM, da
 func (h *ScheduleHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	schedule, err := h.scheduleService.GetActiveSchedule()
 	if err != nil || schedule == nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Нет активного расписания.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	var weekday int = schedule.Weekday
@@ -67,10 +70,13 @@ func (h *ScheduleHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 	if err != nil {
 		log.Printf("Error parsing time: %v", err)
 	}
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Активное расписание: " + out,
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }
 
 func (h *ScheduleHandler) HandleReschedule(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -176,17 +182,23 @@ func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
 	}
 	_, err := h.scheduleService.ReplaceSchedule(schedule)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Ошибка при сохранении расписания.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		f.Reset(userID)
 		return
 	}
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Расписание успешно обновлено.",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 	fsmutils.DeleteMessages(ctx, b, f, userID, update.Message.Chat.ID)
 	f.Reset(userID)
 }
