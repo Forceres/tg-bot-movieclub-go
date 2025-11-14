@@ -33,6 +33,7 @@ type VotingOptions struct {
 	CreatedBy  int64
 	FinishedAt *int64
 	MovieID    *int
+	SessionID  *int64
 }
 
 type StartRatingVotingParams struct {
@@ -48,7 +49,7 @@ type IVotingService interface {
 	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
 	FindVotingByStatus(status string) ([]*model.Voting, error)
 	FinishRatingVoting(params *FinishRatingVotingParams) error
-	FinishSelectionVoting(params *FinishSelectionVotingParams) (int64, error)
+	FinishSelectionVoting(params *FinishSelectionVotingParams) (*model.Session, bool, error)
 	StartVoting(params *StartRatingVotingParams) (*model.Poll, error)
 	FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error)
 }
@@ -102,8 +103,9 @@ func (s *VotingService) FinishRatingVoting(params *FinishRatingVotingParams) err
 	return nil
 }
 
-func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParams) (int64, error) {
-	var finishedAt int64
+func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParams) (*model.Session, bool, error) {
+	var created bool = false
+	var session *model.Session
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
 		err := s.repo.FinishVoting(&repository.FinishVotingParams{
 			VotingID: params.VotingID,
@@ -120,11 +122,15 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 		if err != nil {
 			return err
 		}
-		finishedAt, err = s.scheduleService.GetNextScheduledTime()
+		finishedAt, err := s.scheduleService.GetNextScheduledTime()
 		if err != nil {
 			return err
 		}
-		session, err := s.sessionRepo.GetOngoingSession(tx)
+		session, created, err = s.sessionRepo.FindOrCreateSession(&repository.FindOrCreateSessionParams{
+			CreatedBy:  params.CreatedBy,
+			FinishedAt: &finishedAt,
+			Tx:         tx,
+		})
 		if err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
@@ -152,9 +158,9 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return nil, created, err
 	}
-	return finishedAt, nil
+	return session, created, nil
 }
 
 func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Poll, error) {
@@ -168,6 +174,9 @@ func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Pol
 		}
 		if params.Options.MovieID != nil {
 			voting.MovieID = params.Options.MovieID
+		}
+		if params.Options.SessionID != nil {
+			voting.SessionID = params.Options.SessionID
 		}
 		createdVoting, err := s.repo.CreateVoting(&repository.CreateVotingParams{
 			Voting: voting,

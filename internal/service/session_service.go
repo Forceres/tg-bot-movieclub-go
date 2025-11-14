@@ -14,6 +14,9 @@ type ISessionService interface {
 	FinishSession(sessionID int64) error
 	CancelSession() (*model.Session, error)
 	AddMoviesToSession(createdBy int64, movieIDs []int) (*model.Session, []int, bool, error)
+	FindOngoingSession() (*model.Session, error)
+	RescheduleSession(sessionID int64, finishedAt int64) error
+	FindOrCreateSession(finishedAt int64, createdAt int64) (*model.Session, bool, error)
 }
 
 type SessionService struct {
@@ -26,8 +29,23 @@ func NewSessionService(repo repository.ISessionRepo, movieRepo repository.IMovie
 	return &SessionService{repo: repo, movieRepo: movieRepo, scheduleService: scheduleService}
 }
 
+func (s *SessionService) FindOrCreateSession(finishedAt int64, createdAt int64) (*model.Session, bool, error) {
+	return s.repo.FindOrCreateSession(&repository.FindOrCreateSessionParams{
+		CreatedBy:  createdAt,
+		FinishedAt: &finishedAt,
+	})
+}
+
+func (s *SessionService) RescheduleSession(sessionID int64, finishedAt int64) error {
+	return s.repo.RescheduleSession(sessionID, finishedAt)
+}
+
 func (s *SessionService) CancelSession() (*model.Session, error) {
 	return s.repo.CancelSession()
+}
+
+func (s *SessionService) FindOngoingSession() (*model.Session, error) {
+	return s.repo.FindOngoingSession()
 }
 
 func (s *SessionService) FinishSession(sessionID int64) error {
@@ -47,7 +65,7 @@ func (s *SessionService) FinishSession(sessionID int64) error {
 		for _, movie := range movies {
 			movie.WatchCount += 1
 			movie.FinishedAt = &finishedAt
-			if err := s.movieRepo.Update(&repository.UpdateParams{Movie: &movie, Tx: tx}); err != nil {
+			if err := s.movieRepo.Update(&repository.UpdateParams{Movie: movie, Tx: tx}); err != nil {
 				return err
 			}
 		}

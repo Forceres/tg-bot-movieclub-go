@@ -1,0 +1,87 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: movieclub-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - movieclub-network
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: bot
+    container_name: movieclub-bot
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_GROUP_ID=${TELEGRAM_GROUP_ID}
+      - TELEGRAM_WEBHOOK_SECRET_TOKEN=${TELEGRAM_WEBHOOK_SECRET_TOKEN}
+      - DATABASE_NAME=/root/data/db.sqlite3
+      - KINOPOISK_API_VERSION=${KINOPOISK_API_VERSION:-v2.2}
+      - KINOPOISK_API_KEY=${KINOPOISK_API_KEY}
+      - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
+      - NODE_ENV=PRODUCTION
+      - DOMAIN_ADDRESS=${DOMAIN_ADDRESS}
+    volumes:
+      - bot_data:/root/data
+    networks:
+      - movieclub-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: worker
+    container_name: movieclub-worker
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_GROUP_ID=${TELEGRAM_GROUP_ID}
+      - DATABASE_NAME=/root/data/db.sqlite3
+      - REDIS_URL=${REDIS_URL}
+      - KINOPOISK_API_VERSION=${KINOPOISK_API_VERSION:-v2.2}
+      - KINOPOISK_API_KEY=${KINOPOISK_API_KEY}
+      - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
+    volumes:
+      - bot_data:/root/data
+    networks:
+      - movieclub-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  redis_data:
+    driver: local
+  bot_data:
+    driver: local
+
+networks:
+  movieclub-network:
+    driver: bridge

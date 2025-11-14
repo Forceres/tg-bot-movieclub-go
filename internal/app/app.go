@@ -3,6 +3,7 @@ package app
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
@@ -106,7 +107,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f, services.ScheduleDatepicker)
 	cancelSessionHandler := telegram.NewCancelSessionHandler(services.SessionService, services.VotingService, services.AsynqInspector)
 	addsMovieHandler := telegram.NewAddsMovieHandler(services.MovieService, services.KinopoiskService, services.SessionService, services.PollService, services.AsynqClient, services.AsynqInspector)
-	rescheduleSessionHandler := telegram.NewResheduleSessionHandler(f, services.SessionDatepicker)
+	rescheduleSessionHandler := telegram.NewResheduleSessionHandler(f, services.SessionDatepicker, services.SessionService, services.AsynqInspector, services.AsynqClient)
 
 	handlers := &Handlers{
 		HelpHandler:                 telegram.HelpHandler,
@@ -151,8 +152,14 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 }
 
 func LoadServices(cfg *config.Config) *Services {
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: cfg.Redis.URL})
+	nodeEnv := os.Getenv("NODE_ENV")
+	redisClientOpts := asynq.RedisClientOpt{Addr: cfg.Redis.URL}
+	if nodeEnv == "PRODUCTION" {
+		redisClientOpts.Password = cfg.Redis.Password
+	}
+
+	client := asynq.NewClient(redisClientOpts)
+	inspector := asynq.NewInspector(redisClientOpts)
 
 	db, err := db.NewSqliteDB(cfg.Database)
 	if err != nil {
@@ -203,11 +210,13 @@ func LoadServices(cfg *config.Config) *Services {
 
 func RegisterTaskProcessors(services *Services, b *bot.Bot, mux *asynq.ServeMux) {
 	closeRatingVotingProcessor := tasks.NewCloseRatingVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
-	closeSelectionVotingProcessor := tasks.NewCloseSelectionVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService)
+	closeSelectionVotingProcessor := tasks.NewCloseSelectionVotingTaskProcessor(b, services.VotingService, services.VoteService, services.MovieService, services.AsynqInspector, services.AsynqClient)
 	openRatingVotingProcessor := tasks.NewOpenRatingVotingTaskProcessor(b, services.VotingService, services.MovieService, services.AsynqClient)
+	finishSessionProcessor := tasks.NewFinishSessionTaskProcessor(services.SessionService)
 	mux.HandleFunc(tasks.CloseRatingVotingTaskType, closeRatingVotingProcessor.Process)
 	mux.HandleFunc(tasks.CloseSelectionVotingTaskType, closeSelectionVotingProcessor.Process)
 	mux.HandleFunc(tasks.OpenRatingVotingTaskType, openRatingVotingProcessor.Process)
+	mux.HandleFunc(tasks.FinishSessionTaskType, finishSessionProcessor.Process)
 }
 
 func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *config.Config) {
@@ -215,6 +224,7 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandlerMatchFunc(telegram.UpdateChatMemberMatchFunc(), handlers.UpdateChatMemberHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "#перенос", bot.MatchTypeExact, handlers.RescheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "help", bot.MatchTypeCommand, handlers.HelpHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "now", bot.MatchTypeCommand, handlers.CurrentMoviesHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "already", bot.MatchTypeCommand, handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)

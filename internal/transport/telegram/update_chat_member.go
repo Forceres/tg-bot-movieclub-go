@@ -29,7 +29,7 @@ func NewUpdateChatMemberHandler(userService service.IUserService) *UpdateChatMem
 
 func (h *UpdateChatMemberHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
 	var user *model.User
-	var role string = "USER"
+	var role string = model.ROLE_USER
 	if update.ChatMember != nil && (update.ChatMember.NewChatMember.Member != nil || update.ChatMember.OldChatMember.Member != nil) {
 		user = &model.User{
 			ID:        update.ChatMember.NewChatMember.Member.User.ID,
@@ -39,7 +39,7 @@ func (h *UpdateChatMemberHandler) Handle(ctx context.Context, b *bot.Bot, update
 		}
 	}
 	if update.ChatMember != nil && (update.ChatMember.NewChatMember.Administrator != nil || update.ChatMember.OldChatMember.Administrator != nil || update.ChatMember.NewChatMember.Owner != nil || update.ChatMember.OldChatMember.Owner != nil) {
-		role = "ADMIN"
+		role = model.ROLE_ADMIN
 	}
 	err := h.userService.CreateIfNotExist(user, role)
 	if err != nil {

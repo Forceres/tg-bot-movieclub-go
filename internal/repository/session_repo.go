@@ -26,10 +26,12 @@ type FinishSessionParams struct {
 
 type ISessionRepo interface {
 	GetOngoingSession(tx *gorm.DB) (*model.Session, error)
-	Create(params *CreateSessionParams) (*model.Session, error)
+	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error)
 	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
 	FinishSession(params *FinishSessionParams) (*model.Session, error)
 	CancelSession() (*model.Session, error)
+	FindOngoingSession() (*model.Session, error)
+	RescheduleSession(sessionID int64, finishedAt int64) error
 	Transaction(fc func(tx *gorm.DB) error) error
 }
 
@@ -43,6 +45,19 @@ func NewSessionRepository(db *gorm.DB) ISessionRepo {
 
 func (r *SessionRepo) Transaction(fc func(tx *gorm.DB) error) error {
 	return r.db.Transaction(fc)
+}
+
+func (r *SessionRepo) RescheduleSession(sessionID int64, finishedAt int64) error {
+	return r.db.Model(&model.Session{ID: sessionID}).Update("finished_at", finishedAt).Error
+}
+
+func (r *SessionRepo) FindOngoingSession() (*model.Session, error) {
+	var session model.Session
+	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Preload("Movies").First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 func (r *SessionRepo) CancelSession() (*model.Session, error) {
@@ -80,18 +95,21 @@ func (r *SessionRepo) GetOngoingSession(tx *gorm.DB) (*model.Session, error) {
 	return &session, nil
 }
 
-func (r *SessionRepo) Create(params *CreateSessionParams) (*model.Session, error) {
-	db := r.db
+func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error) {
+	var session model.Session
+	var created bool = false
+	var tx *gorm.DB = r.db
 	if params.Tx != nil {
 		db = params.Tx
 	}
-	if params.Session == nil {
-		return nil, errors.New("session is required")
+	err := tx.Where("status = ?", model.SESSION_ONGOING_STATUS).Attrs(&model.Session{Status: model.SESSION_ONGOING_STATUS, CreatedBy: params.CreatedBy, FinishedAt: *params.FinishedAt}).FirstOrCreate(&session).Error
+	if session.CreatedAt.Equal(session.UpdatedAt) {
+		created = true
 	}
-	if err := db.Create(params.Session).Error; err != nil {
-		return nil, err
+	if err != nil {
+		return nil, false, err
 	}
-	return params.Session, nil
+	return &session, created, nil
 }
 
 func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error {
@@ -99,8 +117,7 @@ func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParam
 	if params.Tx != nil {
 		tx = params.Tx
 	}
-
-	var movies []model.Movie
+	var movies []*model.Movie
 	if err := tx.Where("id IN ?", params.MovieIDs).Find(&movies).Error; err != nil {
 		return err
 	}

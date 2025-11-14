@@ -3,14 +3,17 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
 	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
 	"github.com/go-telegram/ui/paginator"
+	"github.com/hibiken/asynq"
 )
 
 const statePrepareCancelIDs fsm.StateID = "prepare_cancel_ids"
@@ -19,6 +22,7 @@ const stateCancel fsm.StateID = "cancel"
 type CancelVotingHandler struct {
 	f             *fsm.FSM
 	votingService service.IVotingService
+	inspector     *asynq.Inspector
 }
 
 type ICancelVotingHandler interface {
@@ -109,16 +113,37 @@ func (h *CancelVotingHandler) Cancel(f *fsm.FSM, args ...any) {
 	for _, id := range ids.([]int64) {
 		voting, err := h.votingService.UpdateVotingStatus(&model.Voting{ID: id, Status: "cancelled"})
 		if err != nil {
-			b.SendMessage(ctx, &bot.SendMessageParams{
+			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,
 				Text:   fmt.Sprintf("Ошибка при отмене голосования с ID %d.", voting.ID),
 			})
+			if err != nil {
+				log.Printf("Error sending message: %v", err)
+			}
+			continue
+		}
+		var taskId string
+		switch voting.Type {
+		case model.VOTING_RATING_TYPE:
+			taskId = fmt.Sprintf("%s-%d", tasks.CloseRatingVotingTaskType, voting.ID)
+		case model.VOTING_SELECTION_TYPE:
+			taskId = fmt.Sprintf("%s-%d", tasks.CloseSelectionVotingTaskType, voting.ID)
+		}
+		taskInfo, err := h.inspector.GetTaskInfo(tasks.QUEUE, taskId)
+		if err != nil {
+			continue
+		}
+		err = h.inspector.DeleteTask(taskInfo.Queue, taskInfo.ID)
+		if err != nil {
 			continue
 		}
 	}
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "Выбранные голосования были отменены.",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 	h.f.Reset(userID)
 }

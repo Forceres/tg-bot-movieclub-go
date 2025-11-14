@@ -49,10 +49,10 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	case statePrepareVotingDuration:
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		duration, errDuration := strconv.Atoi(update.Message.Text)
-		if errDuration != nil {
+		if errDuration != nil || duration <= 0 {
 			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
-				Text:   "Введите корректное целое число",
+				Text:   "Введите корректное целое число > 0",
 			})
 			if err != nil {
 				log.Printf("Error sending message: %v", err)
@@ -68,9 +68,14 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		movieIndexes := []int64{}
 		iter := strings.SplitSeq(indexes, ",")
+		unique := make(map[int64]struct{})
 		for idx := range iter {
 			movieID, err := strconv.ParseInt(strings.TrimSpace(idx), 10, 64)
 			if err == nil {
+				if _, exists := unique[movieID]; exists {
+					continue
+				}
+				unique[movieID] = struct{}{}
 				movieIndexes = append(movieIndexes, movieID)
 			}
 		}
@@ -93,10 +98,15 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		cancelIndexes := []int64{}
 		iter := strings.SplitSeq(idxs, ",")
+		unique := make(map[int64]struct{})
 		for id := range iter {
-			cancelID, err := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
+			cancelIdx, err := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
 			if err == nil {
-				cancelIndexes = append(cancelIndexes, cancelID)
+				if _, exists := unique[cancelIdx]; exists {
+					continue
+				}
+				unique[cancelIdx] = struct{}{}
+				cancelIndexes = append(cancelIndexes, cancelIdx)
 			}
 		}
 		if len(cancelIndexes) == 0 {
@@ -149,13 +159,13 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			part = strings.TrimSpace(part)
 			if hour == nil {
 				parsedHour, err := strconv.Atoi(part)
-				if err != nil {
+				if err != nil || (parsedHour < 0 || parsedHour > 23) {
 					break
 				}
 				hour = &parsedHour
 			} else if minute == nil {
 				parsedMinute, err := strconv.Atoi(part)
-				if err != nil {
+				if err != nil || (parsedMinute < 0 || parsedMinute > 59) {
 					break
 				}
 				minute = &parsedMinute

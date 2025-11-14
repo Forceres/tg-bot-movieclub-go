@@ -43,10 +43,13 @@ func (h *AlreadyWatchedMoviesHandler) Handle(ctx context.Context, b *bot.Bot, up
 	formattedMovies, err := h.movieService.GetAlreadyWatchedMovies()
 	if err != nil {
 		log.Printf("Error retrieving watched movies: %v", err)
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: chatID,
 			Text:   "Ошибка при получении списка фильмов",
 		})
+		if err != nil {
+			log.Printf("Error sending error message: %v", err)
+		}
 		return
 	}
 
@@ -76,11 +79,14 @@ func (h *AlreadyWatchedMoviesHandler) addNewPage(ctx context.Context, b *bot.Bot
 	data.LastPageURL = newPage.Url
 	data.Links = links
 
-	b.EditMessageText(ctx, &bot.EditMessageTextParams{
+	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:    update.Message.Chat.ID,
 		Text:      strings.Join(links, "\n"),
 		MessageID: data.MessageID,
 	})
+	if err != nil {
+		log.Printf("Error editing message text: %v", err)
+	}
 }
 
 func (h *AlreadyWatchedMoviesHandler) handleUpdatePage(ctx context.Context, b *bot.Bot, update *models.Update, data *ChatData) {
@@ -108,11 +114,14 @@ func (h *AlreadyWatchedMoviesHandler) handleUpdatePage(ctx context.Context, b *b
 	timestamp := time.Now().UTC().Format("01-02-2006 15:04:05")
 	linksWithTime := append(links, timestamp)
 
-	b.EditMessageText(ctx, &bot.EditMessageTextParams{
+	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:    update.Message.Chat.ID,
 		Text:      strings.Join(linksWithTime, "\n"),
 		MessageID: data.MessageID,
 	})
+	if err != nil {
+		log.Printf("Error editing message text: %v", err)
+	}
 }
 
 func (h *AlreadyWatchedMoviesHandler) handleNewPages(ctx context.Context, b *bot.Bot, update *models.Update, data *ChatData, pages []string) {
@@ -149,16 +158,21 @@ func (h *AlreadyWatchedMoviesHandler) createInitialMessage(ctx context.Context, 
 	data.MessageID = msg.ID
 	data.Links = links
 
-	b.PinChatMessage(ctx, &bot.PinChatMessageParams{
+	_, err = b.PinChatMessage(ctx, &bot.PinChatMessageParams{
 		ChatID:              update.Message.Chat.ID,
 		MessageID:           data.MessageID,
 		DisableNotification: true,
 	})
-
-	b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+	if err != nil {
+		log.Printf("Error pinning message: %v", err)
+	}
+	_, err = b.DeleteMessage(ctx, &bot.DeleteMessageParams{
 		ChatID:    update.Message.Chat.ID,
 		MessageID: data.MessageID - 1,
 	})
+	if err != nil {
+		log.Printf("Error deleting message: %v", err)
+	}
 }
 
 func (h *AlreadyWatchedMoviesHandler) getChatData(chatID int64) *ChatData {

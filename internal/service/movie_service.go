@@ -41,7 +41,7 @@ type IMovieService interface {
 	GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error)
 	GetMovieByID(id int) (*model.Movie, error)
 	Create(movie *MovieDTO, suggestedBy int64) error
-	generateHTMLForWatchedMovies(movies []model.Movie) []string
+	generateHTMLForWatchedMovies(movies []*model.Movie) []string
 }
 
 type MovieService struct {
@@ -117,7 +117,7 @@ func (s *MovieService) GetAlreadyWatchedMovies() ([]string, error) {
 }
 
 func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error) {
-	var movies []model.Movie
+	var movies []*model.Movie
 	var err error
 
 	if suggested {
@@ -142,7 +142,7 @@ func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, 
 	return list, nil
 }
 
-func (s *MovieService) generateHTMLForWatchedMovies(movies []model.Movie) []string {
+func (s *MovieService) generateHTMLForWatchedMovies(movies []*model.Movie) []string {
 	var pages []string
 	var html strings.Builder
 
