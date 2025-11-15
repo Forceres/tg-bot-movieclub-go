@@ -1,13 +1,54 @@
 package repository
 
 import (
+	"log"
+
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
+type ConnectMoviesToSessionParams struct {
+	SessionID int64
+	MovieIDs  []int64
+	Tx        *gorm.DB
+}
+
+type FindOrCreateSessionParams struct {
+	CreatedBy  int64
+	FinishedAt *int64
+	Tx         *gorm.DB
+}
+
+type CreateSessionParams struct {
+	Session *model.Session
+	Tx      *gorm.DB
+}
+
+type FinishSessionParams struct {
+	SessionID int64
+	Tx        *gorm.DB
+}
+
+type DisconnectMoviesFromSessionParams struct {
+	SessionID int64
+	MovieIDs  []int64
+	Tx        *gorm.DB
+}
+
 type ISessionRepo interface {
-	FindOrCreateSession(createdBy *int64) (*model.Session, error)
-	ConnectMoviesToSession(sessionID int64, movieIDs []int) error
+	GetOngoingSession(tx *gorm.DB) (*model.Session, error)
+	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error)
+	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
+	FinishSession(params *FinishSessionParams) (*model.Session, error)
+	CancelSession(tx *gorm.DB) (*model.Session, error)
+	FindOngoingSession() (*model.Session, error)
+	RescheduleSession(sessionID int64, finishedAt int64) error
+	Transaction(fc func(tx *gorm.DB) error) error
+	Create(params *CreateSessionParams) (*model.Session, error)
+	DisconnectMoviesFromSession(params *DisconnectMoviesFromSessionParams) error
+	FindByID(sessionID int64) (*model.Session, error)
+	Update(session *model.Session) error
 }
 
 type SessionRepo struct {
@@ -18,26 +59,132 @@ func NewSessionRepository(db *gorm.DB) ISessionRepo {
 	return &SessionRepo{db: db}
 }
 
-func (r *SessionRepo) FindOrCreateSession(createdBy *int64) (*model.Session, error) {
-	var session *model.Session
-	err := r.db.Where("status = ?", "ongoing").Attrs(&model.Session{Status: "ongoing", CreatedBy: *createdBy}).FirstOrCreate(&session).Error
+func (r *SessionRepo) Transaction(fc func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fc)
+}
+
+func (r *SessionRepo) RescheduleSession(sessionID int64, finishedAt int64) error {
+	return r.db.Model(&model.Session{ID: sessionID}).Update("finished_at", finishedAt).Error
+}
+
+func (r *SessionRepo) FindOngoingSession() (*model.Session, error) {
+	var session model.Session
+	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Preload("Movies").Preload("Movies.Suggester").First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *SessionRepo) CancelSession(tx *gorm.DB) (*model.Session, error) {
+	var session model.Session
+	err := tx.Model(&session).Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Clauses(clause.Returning{}).Update("status", model.SESSION_CANCELLED_STATUS).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *SessionRepo) FinishSession(params *FinishSessionParams) (*model.Session, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	sessionID := params.SessionID
+	session := &model.Session{ID: sessionID}
+	err := tx.Model(session).Clauses(clause.Returning{}).Update("status", model.SESSION_FINISHED_STATUS).Error
 	if err != nil {
 		return nil, err
 	}
 	return session, nil
 }
 
-func (r *SessionRepo) ConnectMoviesToSession(sessionID int64, movieIDs []int) error {
-	var movies []model.Movie
-	if err := r.db.Where("id IN ?", movieIDs).Find(&movies).Error; err != nil {
+func (r *SessionRepo) GetOngoingSession(tx *gorm.DB) (*model.Session, error) {
+	db := r.db
+	if tx != nil {
+		db = tx
+	}
+	var session model.Session
+	if err := db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).First(&session).Error; err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error) {
+	var session model.Session
+	var created bool = false
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	err := tx.Where("status = ?", model.SESSION_ONGOING_STATUS).Attrs(&model.Session{Status: model.SESSION_ONGOING_STATUS, CreatedBy: params.CreatedBy, FinishedAt: *params.FinishedAt}).FirstOrCreate(&session).Error
+	if session.CreatedAt.Equal(session.UpdatedAt) {
+		created = true
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	log.Println(session)
+	return &session, created, nil
+}
+
+func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	var movies []*model.Movie
+	if err := tx.Where("id IN ?", params.MovieIDs).Find(&movies).Error; err != nil {
 		return err
 	}
 	var session model.Session
-	if err := r.db.First(&session, sessionID).Error; err != nil {
+	if err := tx.First(&session, params.SessionID).Error; err != nil {
 		return err
 	}
-	if err := r.db.Model(&session).Association("Movies").Append(&movies); err != nil {
+	if err := tx.Model(&session).Association("Movies").Append(&movies); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (r *SessionRepo) DisconnectMoviesFromSession(params *DisconnectMoviesFromSessionParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	var movies []*model.Movie
+	if err := tx.Where("id IN ?", params.MovieIDs).Find(&movies).Error; err != nil {
+		return err
+	}
+	var session model.Session
+	if err := tx.First(&session, params.SessionID).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(&session).Association("Movies").Delete(&movies); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *SessionRepo) Create(params *CreateSessionParams) (*model.Session, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	err := tx.Create(params.Session).Error
+	return params.Session, err
+}
+
+func (r *SessionRepo) FindByID(sessionID int64) (*model.Session, error) {
+	var session model.Session
+	err := r.db.Preload("Movies").Preload("Votings").First(&session, sessionID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *SessionRepo) Update(session *model.Session) error {
+	return r.db.Save(session).Error
 }

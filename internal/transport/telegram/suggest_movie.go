@@ -30,15 +30,18 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	}
 	ids := kinopoisk.ParseIDsOrRefs(update.Message.Text)
 	if len(ids) == 0 {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Не найдено ссылок на фильмы Кинопоиска в сообщении.",
+			Text:   "🔍 Не найдено ссылок на фильмы Кинопоиска в сообщении.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
-	var idsToFind []int
+	var idsToFind []int64
 	for _, id := range ids {
-		intId, err := strconv.Atoi(id)
+		intId, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
 			continue
 		}
@@ -48,43 +51,58 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 		}
 	}
 	if len(idsToFind) == 0 {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Все фильмы из вашего сообщения уже предложены ранее.",
+			Text:   "ℹ️ Все фильмы из вашего сообщения уже предложены ранее.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	if len(ids) > 5 {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Слишком много фильмов в одном сообщении. Пожалуйста, отправляйте не более 5 фильмов за раз.",
+			Text:   "⚠️ Слишком много фильмов в одном сообщении. Пожалуйста, отправляйте не более 5 фильмов за раз.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	moviesDto, err := h.kinopoiskService.SearchMovies(idsToFind, update.Message.From.FirstName)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при поиске фильмов на Кинопоиске.",
+			Text:   "❌ Ошибка при поиске фильмов на Кинопоиске.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	if len(moviesDto) == 0 {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Не удалось найти фильмы по предоставленным ссылкам.",
+			Text:   "🔍 Не удалось найти фильмы по предоставленным ссылкам.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	for _, movieDto := range moviesDto {
-		err := h.movieService.Create(&movieDto, update.Message.From.FirstName)
+		err := h.movieService.Upsert(&movieDto, update.Message.From.ID)
 		if err != nil {
 			log.Printf("Error while creating movie: %v", err)
 			continue
 		}
 	}
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Фильмы успешно добавлены в предложку!",
+		Text:   "✅ Фильмы успешно добавлены в предложку!",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }

@@ -1,34 +1,38 @@
 package repository
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-type FinishRatingVotingParams struct {
+type FinishVotingParams struct {
 	VotingID int64
-	PollID   string
-	MovieID  int
-	Mean     float64
 	Tx       *gorm.DB
 }
 
-type FinishSelectionVotingParams struct {
-	VotingID   int64
-	PollID     string
-	MovieID    int
-	FinishedAt string
-	Tx         *gorm.DB
+type CreateVotingParams struct {
+	Voting *model.Voting
+	Tx     *gorm.DB
+}
+
+type CancelVotingsBySessionIDParams struct {
+	SessionID int64
+	Tx        *gorm.DB
 }
 
 type IVotingRepo interface {
-	CreateVoting(voting *model.Voting) (*model.Voting, error)
+	Transaction(txFunc func(tx *gorm.DB) error) error
+	CreateVoting(params *CreateVotingParams) (*model.Voting, error)
 	FindVotingByID(id int64) (*model.Voting, error)
 	FindVotingsByStatus(status string) ([]*model.Voting, error)
 	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
-	FinishRatingVoting(params *FinishRatingVotingParams) error
+	FinishVoting(params *FinishVotingParams) error
+	FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error)
+	CancelVotingsBySessionID(params *CancelVotingsBySessionIDParams) ([]*model.Voting, error)
 }
 
 type VotingRepo struct {
@@ -41,67 +45,58 @@ func NewVotingRepository(db *gorm.DB, pollRepo IPollRepo, movieRepo IMovieRepo) 
 	return &VotingRepo{db: db, pollRepo: pollRepo, movieRepo: movieRepo}
 }
 
-func (r *VotingRepo) CreateVoting(voting *model.Voting) (*model.Voting, error) {
-	if err := r.db.Create(&voting).Error; err != nil {
+func (r *VotingRepo) Transaction(txFunc func(tx *gorm.DB) error) error {
+	return r.db.Transaction(txFunc)
+}
+
+func (r *VotingRepo) CancelVotingsBySessionID(params *CancelVotingsBySessionIDParams) ([]*model.Voting, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	updates := map[string]interface{}{
+		"status":      model.VOTING_CANCELLED_STATUS,
+		"finished_at": time.Now().Unix(),
+	}
+	votings := []*model.Voting{}
+	err := tx.Model(&model.Voting{}).Clauses(clause.Returning{}).Where(&model.Voting{SessionID: &params.SessionID}).Updates(updates).Find(&votings).Error
+	if err != nil {
+		return nil, err
+	}
+	return votings, nil
+}
+
+func (r *VotingRepo) FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error) {
+	var votings []*model.Voting
+	if err := r.db.Where(&model.Voting{SessionID: &sessionID}).Find(&votings).Error; err != nil {
+		return nil, err
+	}
+	return votings, nil
+}
+
+func (r *VotingRepo) CreateVoting(params *CreateVotingParams) (*model.Voting, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	voting := params.Voting
+	fmt.Printf("Voting created by: %d; movieId: %d; sessionId: %d\n", voting.CreatedBy, voting.MovieID, voting.SessionID)
+	if err := tx.Create(voting).Error; err != nil {
 		return nil, err
 	}
 	return voting, nil
 }
 
-func (r *VotingRepo) FinishRatingVoting(params *FinishRatingVotingParams) error {
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		tx = tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix())
-		if tx.Error != nil {
-			return tx.Error
-		}
-		err := r.pollRepo.UpdateStatus(&UpdateStatusParams{
-			PollID: params.PollID,
-			Status: "closed",
-			Tx:     tx,
-		})
-		if err != nil {
-			return err
-		}
-		err = r.movieRepo.UpdateRating(&UpdateRatingParams{
-			MovieID: params.MovieID,
-			Rating:  params.Mean,
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
+func (r *VotingRepo) FinishVoting(params *FinishVotingParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
 	}
-	return nil
-}
-
-func (r *VotingRepo) FinishSelectionVoting(params *FinishSelectionVotingParams) error {
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		tx = tx.Model(&model.Voting{ID: params.VotingID}).Update("status", "inactive").Update("finished_at", time.Now().Unix())
-		if tx.Error != nil {
-			return tx.Error
-		}
-		err := r.pollRepo.UpdateStatus(&UpdateStatusParams{
-			PollID: params.PollID,
-			Status: "closed",
-			Tx:     tx,
-		})
-		if err != nil {
-			return err
-		}
-		// err = r.movieRepo.UpdateDates(&UpdateDatesParams{
-		// 	MovieID:    params.MovieID,
-		// 	StartedAt:  time.Now().String(),
-		// 	FinishedAt: params.FinishedAt,
-		// 	Tx:         tx,
-		// })
-		// if err != nil {
-		// 	return err
-		// }
-		return nil
-	})
+	updates := map[string]interface{}{
+		"status":      model.VOTING_INACTIVE_STATUS,
+		"finished_at": time.Now().Unix(),
+	}
+	err := tx.Model(&model.Voting{}).Where(&model.Voting{ID: params.VotingID}).Updates(updates).Error
 	if err != nil {
 		return err
 	}

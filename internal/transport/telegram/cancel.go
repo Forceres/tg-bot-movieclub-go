@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"log"
 
 	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
@@ -27,18 +28,24 @@ func (h *CancelHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 	userID := update.Message.From.ID
 	currentState := h.f.Current(userID)
 	if currentState == stateDefault {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "Нечего отменять!",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	messageIDs, ok := fsmutils.GetMessageIDs(h.f, userID)
 	if !ok {
-		b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+		_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
 			ChatID:    update.Message.Chat.ID,
 			MessageID: update.Message.ID,
 		})
+		if err != nil {
+			log.Printf("Error deleting message: %v", err)
+		}
 		return
 	}
 	_, err := b.DeleteMessages(ctx, &bot.DeleteMessagesParams{
@@ -46,7 +53,7 @@ func (h *CancelHandler) Handle(ctx context.Context, b *bot.Bot, update *models.U
 		MessageIDs: append(messageIDs, update.Message.ID),
 	})
 	if err != nil {
-		return
+		log.Printf("Error deleting messages: %v", err)
 	}
 	h.f.Reset(userID)
 }

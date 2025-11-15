@@ -6,12 +6,11 @@ import (
 )
 
 type IPollService interface {
-	CreatePoll(poll *model.Poll) (*model.Poll, error)
 	CreatePollOption(option *model.PollOption) error
 	GetPollByPollID(pollID string) (*model.Poll, error)
-	GetPollOptionsByPollID(pollID int64) ([]model.PollOption, error)
-	GetActivePolls() ([]model.Poll, error)
-	ClosePoll(pollID string) error
+	GetOpenedPollByMovieID(movieID int64) (*model.Poll, error)
+	GetPollOptionsByPollID(pollID int64) ([]*model.PollOption, error)
+	GetPollByVotingID(votingID int64) (*model.Poll, error)
 }
 
 type PollService struct {
@@ -22,8 +21,8 @@ func NewPollService(pollRepo repository.IPollRepo) IPollService {
 	return &PollService{pollRepo: pollRepo}
 }
 
-func (s *PollService) CreatePoll(poll *model.Poll) (*model.Poll, error) {
-	return s.pollRepo.Create(poll)
+func (s *PollService) GetPollByVotingID(votingID int64) (*model.Poll, error) {
+	return s.pollRepo.FindByVotingID(votingID)
 }
 
 func (s *PollService) CreatePollOption(option *model.PollOption) error {
@@ -34,17 +33,10 @@ func (s *PollService) GetPollByPollID(pollID string) (*model.Poll, error) {
 	return s.pollRepo.FindByPollID(pollID)
 }
 
-func (s *PollService) GetPollOptionsByPollID(pollID int64) ([]model.PollOption, error) {
+func (s *PollService) GetOpenedPollByMovieID(movieID int64) (*model.Poll, error) {
+	return s.pollRepo.FindOpenedByMovieID(movieID)
+}
+
+func (s *PollService) GetPollOptionsByPollID(pollID int64) ([]*model.PollOption, error) {
 	return s.pollRepo.FindPollOptionsByPollID(pollID)
-}
-
-func (s *PollService) GetActivePolls() ([]model.Poll, error) {
-	return s.pollRepo.FindActivePolls()
-}
-
-func (s *PollService) ClosePoll(pollID string) error {
-	return s.pollRepo.UpdateStatus(&repository.UpdateStatusParams{
-		PollID: pollID,
-		Status: "closed",
-	})
 }

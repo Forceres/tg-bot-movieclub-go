@@ -3,29 +3,35 @@ package repository
 import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UpdateRatingParams struct {
-	MovieID int
+	MovieID int64
 	Rating  float64
 	Tx      *gorm.DB
 }
 
 type UpdateDatesParams struct {
-	MovieID    int
-	StartedAt  string
-	FinishedAt string
-	Tx         *gorm.DB
+	MovieID   int64
+	StartedAt *string
+	Tx        *gorm.DB
+}
+
+type UpdateParams struct {
+	Movie *model.Movie
+	Tx    *gorm.DB
 }
 
 type IMovieRepo interface {
-	GetCurrentMovies() ([]model.Movie, error)
-	GetAlreadyWatchedMovies() ([]model.Movie, error)
-	GetSuggestedMovies() ([]model.Movie, error)
-	GetMovieByID(id int) (*model.Movie, error)
+	GetCurrentMovies() ([]*model.Movie, error)
+	GetAlreadyWatchedMovies() ([]*model.Movie, error)
+	GetSuggestedMovies() ([]*model.Movie, error)
+	GetMovieByID(id int64) (*model.Movie, error)
 	Create(movie *model.Movie) error
+	Update(params *UpdateParams) error
 	UpdateRating(params *UpdateRatingParams) error
-	UpdateDates(params *UpdateDatesParams) error
+	Upsert(movie *model.Movie) error
 }
 
 type MovieRepo struct {
@@ -40,6 +46,20 @@ func (r *MovieRepo) Create(movie *model.Movie) error {
 	return r.db.Create(movie).Error
 }
 
+func (r *MovieRepo) Upsert(movie *model.Movie) error {
+	return r.db.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&movie).Error
+}
+
+func (r *MovieRepo) Update(params *UpdateParams) error {
+	tx := params.Tx
+	if tx == nil {
+		tx = r.db
+	}
+	return tx.Save(params.Movie).Error
+}
+
 func (r *MovieRepo) UpdateRating(params *UpdateRatingParams) error {
 	tx := params.Tx
 	if tx == nil {
@@ -48,22 +68,7 @@ func (r *MovieRepo) UpdateRating(params *UpdateRatingParams) error {
 	return tx.Model(&model.Movie{ID: params.MovieID}).Update("rating", params.Rating).Error
 }
 
-func (r *MovieRepo) UpdateDates(params *UpdateDatesParams) error {
-	tx := params.Tx
-	if tx == nil {
-		tx = r.db
-	}
-	updates := map[string]string{}
-	if params.StartedAt != "" {
-		updates["started_at"] = params.StartedAt
-	}
-	if params.FinishedAt != "" {
-		updates["finished_at"] = params.FinishedAt
-	}
-	return tx.Model(&model.Movie{ID: params.MovieID}).Updates(updates).Error
-}
-
-func (r *MovieRepo) GetMovieByID(id int) (*model.Movie, error) {
+func (r *MovieRepo) GetMovieByID(id int64) (*model.Movie, error) {
 	var movie model.Movie
 	if err := r.db.Model(&model.Movie{}).Where(&model.Movie{ID: id}).First(&movie).Error; err != nil {
 		return nil, err
@@ -71,13 +76,13 @@ func (r *MovieRepo) GetMovieByID(id int) (*model.Movie, error) {
 	return &movie, nil
 }
 
-func (r *MovieRepo) GetCurrentMovies() ([]model.Movie, error) {
-	var movies []model.Movie
+func (r *MovieRepo) GetCurrentMovies() ([]*model.Movie, error) {
+	var movies []*model.Movie
 
 	sub := r.db.Model(&model.Session{}).
-		Select("movies_sessions.session_id").
+		Select("movies_sessions.movie_id").
 		Joins("JOIN movies_sessions ON movies_sessions.session_id = sessions.id").
-		Where(&model.Session{Status: "ACTIVE"})
+		Where(&model.Session{Status: model.SESSION_ONGOING_STATUS})
 
 	if err := r.db.Model(&model.Movie{}).Where("id IN (?)", sub).Find(&movies).Error; err != nil {
 		return nil, err
@@ -86,17 +91,17 @@ func (r *MovieRepo) GetCurrentMovies() ([]model.Movie, error) {
 	return movies, nil
 }
 
-func (r *MovieRepo) GetAlreadyWatchedMovies() ([]model.Movie, error) {
-	var movies []model.Movie
-	if err := r.db.Model(&model.Movie{}).Where(r.db.Not(&model.Movie{FinishedAt: ""})).Find(&movies).Error; err != nil {
+func (r *MovieRepo) GetAlreadyWatchedMovies() ([]*model.Movie, error) {
+	var movies []*model.Movie
+	if err := r.db.Model(&model.Movie{}).Preload("Suggester").Where("watch_count > 0").Find(&movies).Error; err != nil {
 		return nil, err
 	}
 	return movies, nil
 }
 
-func (r *MovieRepo) GetSuggestedMovies() ([]model.Movie, error) {
-	var movies []model.Movie
-	if err := r.db.Model(&model.Movie{}).Where(&model.Movie{StartedAt: ""}).Find(&movies).Error; err != nil {
+func (r *MovieRepo) GetSuggestedMovies() ([]*model.Movie, error) {
+	var movies []*model.Movie
+	if err := r.db.Model(&model.Movie{}).Preload("Suggester").Where(&model.Movie{Status: model.MOVIE_SUGGESTED_STATUS}).Find(&movies).Error; err != nil {
 		return nil, err
 	}
 	return movies, nil

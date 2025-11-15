@@ -8,6 +8,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/repository"
 	"github.com/go-telegram/bot"
+	"github.com/goodsign/monday"
 )
 
 const MOVIE_FORMAT = `
@@ -23,13 +24,13 @@ const MOVIE_FORMAT = `
 `
 
 const ALREADY_WATCHED_MOVIES_FORMAT = `<p><b>#%d: %s (%d)</b>
-<b>Режиссер: %s <br>Страны выпуска: %s</b>
-<b>Жанры: %s</b>
-<b>Длительность в минутах: %d</b>
-<b>Рейтинг IMDb: %f</b>
-<b>Рейтинг КиноКласса: %s</b>
-<i>Дата просмотра: %s</i>
-<i>Предложен: %s</i>
+<b>Режиссер: %s <br>Страны выпуска: %s.</b>
+<b>Жанры: %s.</b>
+<b>Длительность в минутах: %d.</b>
+<b>Рейтинг IMDb: %f.</b>
+<b>Рейтинг КиноКласса: %s.</b>
+<i>Дата просмотра: %s.</i>
+<i>Предложен: %s.</i>
 <a href=%s><i>Ссылка</i></a>
 </p>`
 
@@ -39,22 +40,25 @@ type IMovieService interface {
 	GetCurrentMovies() (*string, error)
 	GetAlreadyWatchedMovies() ([]string, error)
 	GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error)
-	GetMovieByID(id int) (*model.Movie, error)
-	Create(movie *MovieDTO, suggestedBy string) error
-	generateHTMLForWatchedMovies(movies []model.Movie) []string
+	GetMovieByID(id int64) (*model.Movie, error)
+	Create(movie *MovieDTO, suggestedBy int64) error
+	Upsert(movie *MovieDTO, suggestedBy int64) error
+	generateHTMLForWatchedMovies(movies []*model.Movie) []string
 }
 
 type MovieService struct {
-	repo repository.IMovieRepo
+	repo        repository.IMovieRepo
+	sessionRepo repository.ISessionRepo
 }
 
-func NewMovieService(repo repository.IMovieRepo) *MovieService {
-	return &MovieService{repo: repo}
+func NewMovieService(repo repository.IMovieRepo, sessionRepo repository.ISessionRepo) *MovieService {
+	return &MovieService{repo: repo, sessionRepo: sessionRepo}
 }
 
-func (s *MovieService) Create(movie *MovieDTO, suggestedBy string) error {
+func (s *MovieService) Upsert(movie *MovieDTO, suggestedBy int64) error {
+	suggestedAt := time.Now().Unix()
 	newMovie := model.Movie{
-		ID:          0,
+		ID:          movie.KinopoiskID,
 		Title:       movie.Title,
 		Description: movie.Description,
 		Directors:   strings.Join(movie.Directors, ", "),
@@ -64,13 +68,32 @@ func (s *MovieService) Create(movie *MovieDTO, suggestedBy string) error {
 		Link:        movie.Link,
 		Duration:    movie.Duration,
 		IMDBRating:  movie.IMDBRating,
-		SuggestedBy: movie.SuggestedBy,
-		SuggestedAt: time.Now().String(),
+		SuggestedBy: &suggestedBy,
+		SuggestedAt: &suggestedAt,
+	}
+	return s.repo.Upsert(&newMovie)
+}
+
+func (s *MovieService) Create(movie *MovieDTO, suggestedBy int64) error {
+	suggestedAt := time.Now().Unix()
+	newMovie := model.Movie{
+		ID:          movie.KinopoiskID,
+		Title:       movie.Title,
+		Description: movie.Description,
+		Directors:   strings.Join(movie.Directors, ", "),
+		Year:        movie.Year,
+		Countries:   strings.Join(movie.Countries, ", "),
+		Genres:      strings.Join(movie.Genres, ", "),
+		Link:        movie.Link,
+		Duration:    movie.Duration,
+		IMDBRating:  movie.IMDBRating,
+		SuggestedBy: &suggestedBy,
+		SuggestedAt: &suggestedAt,
 	}
 	return s.repo.Create(&newMovie)
 }
 
-func (s *MovieService) GetMovieByID(id int) (*model.Movie, error) {
+func (s *MovieService) GetMovieByID(id int64) (*model.Movie, error) {
 	movie, err := s.repo.GetMovieByID(id)
 	if err != nil {
 		return nil, err
@@ -79,17 +102,45 @@ func (s *MovieService) GetMovieByID(id int) (*model.Movie, error) {
 }
 
 func (s *MovieService) GetCurrentMovies() (*string, error) {
-	movies, err := s.repo.GetCurrentMovies()
+	session, err := s.sessionRepo.FindOngoingSession()
 	if err != nil {
 		return nil, err
 	}
-	if len(movies) == 0 {
+	if session == nil {
+		return nil, fmt.Errorf("no ongoing session found")
+	}
+	if len(session.Movies) == 0 {
 		return nil, fmt.Errorf("no current movies found")
 	}
-	formattedMovies := make([]string, len(movies)+1)
-	formattedMovies[0] = "<b>#смотрим</b>"
+	finishedAt := time.Unix(session.FinishedAt, 0)
+	month := monday.Format(finishedAt, "January", monday.LocaleRuRU)
+	day := monday.Format(finishedAt, "Monday", monday.LocaleRuRU)
+	month = strings.ToUpper(month)
+	day = strings.ToLower(day)
+	dateStr := finishedAt.Format("02.01.2006")
+	timeStr := finishedAt.Format("15:04")
+	schedule := fmt.Sprintf("%s | %s 🗓️\n%s | %s 🕤", month, dateStr, day, timeStr)
+	movies := session.Movies
+	var offset int
+	var formattedMovies []string
+	if session.Description != "" {
+		offset = 3
+		formattedMovies = make([]string, len(movies)+offset)
+		formattedMovies[0] = session.Description
+		formattedMovies[1] = schedule
+		formattedMovies[2] = "<b>#смотрим</b>"
+	} else {
+		offset = 2
+		formattedMovies = make([]string, len(movies)+offset)
+		formattedMovies[0] = schedule
+		formattedMovies[1] = "<b>#смотрим</b>"
+	}
 	for i, movie := range movies {
-		formattedMovies[i+1] = fmt.Sprintf(MOVIE_FORMAT,
+		var suggestedBy string = "Неизвестно"
+		if movie.Suggester != nil {
+			suggestedBy = fmt.Sprintf("%s %s", movie.Suggester.FirstName, movie.Suggester.LastName)
+		}
+		formattedMovies[i+offset] = fmt.Sprintf(MOVIE_FORMAT,
 			movie.ID,
 			movie.Title,
 			movie.Genres,
@@ -98,7 +149,7 @@ func (s *MovieService) GetCurrentMovies() (*string, error) {
 			movie.Directors,
 			movie.Year,
 			movie.Duration,
-			movie.SuggestedBy,
+			suggestedBy,
 			movie.Link,
 		)
 	}
@@ -116,7 +167,7 @@ func (s *MovieService) GetAlreadyWatchedMovies() ([]string, error) {
 }
 
 func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error) {
-	var movies []model.Movie
+	var movies []*model.Movie
 	var err error
 
 	if suggested {
@@ -133,15 +184,15 @@ func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, 
 	list := make([][]string, len(movies))
 	for i, movie := range movies {
 		movieString := fmt.Sprintf(`%d. %s (%d)`, movie.ID, movie.Title, movie.Year)
-		if movie.SuggestedBy != "" {
-			movieString += fmt.Sprintf(" - предложил: %s", movie.SuggestedBy)
+		if movie.Suggester != nil {
+			movieString += fmt.Sprintf(" - предложил: %s %s", movie.Suggester.FirstName, movie.Suggester.LastName)
 		}
-		list[i] = []string{fmt.Sprint(movie.ID), bot.EscapeMarkdown(movieString)}
+		list[i] = []string{fmt.Sprint(movie.ID), bot.EscapeMarkdownUnescaped(movieString)}
 	}
 	return list, nil
 }
 
-func (s *MovieService) generateHTMLForWatchedMovies(movies []model.Movie) []string {
+func (s *MovieService) generateHTMLForWatchedMovies(movies []*model.Movie) []string {
 	var pages []string
 	var html strings.Builder
 
@@ -151,10 +202,10 @@ func (s *MovieService) generateHTMLForWatchedMovies(movies []model.Movie) []stri
 			rating = fmt.Sprintf("%.1f", movie.Rating)
 		}
 		var suggestedBy string = "Неизвестно"
-		if movie.SuggestedBy != "" {
-			suggestedBy = movie.SuggestedBy
+		if movie.Suggester != nil {
+			suggestedBy = fmt.Sprintf("%s %s", movie.Suggester.FirstName, movie.Suggester.LastName)
 		}
-		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, movie.StartedAt, suggestedBy, movie.Link))
+		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, *movie.FinishedAt, suggestedBy, movie.Link))
 
 		if (i+1)%ALREADY_WATCHED_MOVIES_PAGE_SIZE == 0 || i == len(movies)-1 {
 			pages = append(pages, html.String())

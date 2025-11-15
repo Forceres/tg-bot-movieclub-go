@@ -5,32 +5,60 @@ import (
 	"gorm.io/gorm"
 )
 
+type DeleteByUserIdAndVotingIdParams struct {
+	UserID   int64
+	VotingID int64
+	Tx       *gorm.DB
+}
+
+type CreateVoteParams struct {
+	Vote *model.Vote
+	Tx   *gorm.DB
+}
+
 type IVoteRepo interface {
-	Create(vote *model.Vote) error
-	FindVotesByVotingID(id int64) (*model.Vote, error)
+	Create(params *CreateVoteParams) error
+	DeleteByUserIdAndVotingId(params *DeleteByUserIdAndVotingIdParams) error
 	CalculateRatingMean(votingID int64) (float64, error)
-	CalculateMaxMovieCount(votingID int64) (int64, int, error)
+	CalculateMaxMovieCount(votingID int64) (int64, int64, error)
+	Transaction(func(tx *gorm.DB) error) error
 }
 
 type VoteRepo struct {
 	db *gorm.DB
 }
 
-func NewVoteRepository(db *gorm.DB) *VoteRepo {
+func NewVoteRepository(db *gorm.DB) IVoteRepo {
 	return &VoteRepo{db: db}
 }
 
-func (r *VoteRepo) Create(vote *model.Vote) error {
-	if err := r.db.Create(&vote).Error; err != nil {
+func (r *VoteRepo) Transaction(fn func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fn)
+}
+
+func (r *VoteRepo) DeleteByUserIdAndVotingId(params *DeleteByUserIdAndVotingIdParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	return tx.Where(&model.Vote{UserID: params.UserID, VotingID: params.VotingID}).Delete(&model.Vote{}).Error
+}
+
+func (r *VoteRepo) Create(params *CreateVoteParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	if err := tx.Create(params.Vote).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *VoteRepo) CalculateMaxMovieCount(votingID int64) (int64, int, error) {
+func (r *VoteRepo) CalculateMaxMovieCount(votingID int64) (int64, int64, error) {
 	var result struct {
 		MovieCount int64
-		MovieID    int
+		MovieID    int64
 	}
 	err := r.db.Model(&model.Vote{}).
 		Select("COUNT(*) as movie_count, movie_id").
@@ -57,12 +85,4 @@ func (r *VoteRepo) CalculateRatingMean(votingID int64) (float64, error) {
 		return 0, err
 	}
 	return result.Mean, nil
-}
-
-func (r *VoteRepo) FindVotesByVotingID(id int64) (*model.Vote, error) {
-	var vote model.Vote
-	if err := r.db.First(&vote, "voting_id = ?", id).Error; err != nil {
-		return nil, err
-	}
-	return &vote, nil
 }

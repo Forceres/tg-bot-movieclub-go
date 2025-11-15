@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"net/http"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/transport/telegram"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/middleware"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/datepicker"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/fsm"
 )
@@ -46,6 +47,16 @@ const (
 	AllowedUpdateRemovedChatBoost        string = "removed_chat_boost"
 )
 
+var allowedUpdates = []string{
+	AllowedUpdateMessage,
+	AllowedUpdateEditedMessage,
+	AllowedUpdateChannelPost,
+	AllowedUpdateEditedChannelPost,
+	AllowedUpdateCallbackQuery,
+	AllowedUpdatePoll,
+	AllowedUpdatePollAnswer,
+}
+
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -59,60 +70,94 @@ func main() {
 		stateDefault,
 		map[fsm.StateID]fsm.Callback{},
 	)
-	handlers := app.LoadApp(cfg, f)
+	handlers, middlewares, services := app.LoadApp(cfg, f)
+	defer services.AsynqClient.Close()
+	defer services.AsynqInspector.Close()
 	defaultHandler := telegram.NewDefaultHandler(f)
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler.Handle),
 		bot.WithMiddlewares(
-			middleware.Authentication(cfg.Telegram.GroupID),
-			middleware.Log,
-			middleware.Delete,
+			middlewares.Authentication,
+			middlewares.Log,
 		),
-		bot.WithAllowedUpdates([]string{
-			AllowedUpdateMessage,
-			AllowedUpdateEditedMessage,
-			AllowedUpdateChannelPost,
-			AllowedUpdateEditedChannelPost,
-			AllowedUpdateCallbackQuery,
-			AllowedUpdatePoll,
-			AllowedUpdatePollAnswer,
-		}),
+		bot.WithAllowedUpdates(allowedUpdates),
 	}
 	if nodeEnv == PRODUCTION {
-		err := startWebhook(ctx, opts, cfg, handlers)
+		err := startWebhook(ctx, opts, cfg, handlers, services)
 		if err != nil {
 			log.Fatalf("Failed to start webhook: %v", err)
 		}
 	} else {
-		err := startLongPolling(ctx, opts, cfg, handlers)
+		err := startLongPolling(ctx, opts, cfg, handlers, services)
 		if err != nil {
 			log.Fatalf("Failed to start long polling: %v", err)
 		}
 	}
 }
 
-func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
+func startLongPolling(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers, services *app.Services) error {
 	b, err := bot.New(cfg.Telegram.BotToken, opts...)
 	if err != nil {
 		log.Printf("Failed to create bot: %v", err)
 		return err
 	}
-	app.RegisterHandlers(b, handlers, cfg)
+	datepicker.ScheduleDatepicker(b, services.ScheduleDatepicker)
+	datepicker.SessionDatepicker(b, services.SessionDatepicker)
+	app.RegisterHandlers(b, handlers, services, cfg)
 	b.Start(ctx)
 	return nil
 }
 
-func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers) error {
+func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, handlers *app.Handlers, services *app.Services) error {
 	opts = append(opts, bot.WithWebhookSecretToken(cfg.Telegram.WebhookSecretToken))
 	b, err := bot.New(cfg.Telegram.BotToken, opts...)
 	if err != nil {
 		log.Printf("Failed to create bot: %v", err)
 		return err
 	}
-	app.RegisterHandlers(b, handlers, cfg)
+	// Cleanup function to delete webhook on exit
+	defer func() {
+		log.Println("Deleting webhook...")
+		deleteCtx := context.Background()
+		ok, err := b.DeleteWebhook(deleteCtx, &bot.DeleteWebhookParams{
+			DropPendingUpdates: true,
+		})
+		if err != nil {
+			log.Printf("Failed to delete webhook: %v", err)
+		} else if ok {
+			log.Println("Webhook deleted successfully")
+		}
+	}()
+	datepicker.ScheduleDatepicker(b, services.ScheduleDatepicker)
+	datepicker.SessionDatepicker(b, services.SessionDatepicker)
+	app.RegisterHandlers(b, handlers, services, cfg)
+	ok, err := b.SetWebhook(ctx, &bot.SetWebhookParams{
+		URL:                cfg.DomainAddress,
+		DropPendingUpdates: true,
+		SecretToken:        cfg.Telegram.WebhookSecretToken,
+		AllowedUpdates:     allowedUpdates,
+	})
+	if err != nil || !ok {
+		log.Printf("Failed to set webhook: %v", err)
+		return err
+	}
 	go b.StartWebhook(ctx)
-	err = http.ListenAndServe(":2000", b.WebhookHandler())
-	if err != nil {
+	server := &http.Server{
+		Addr:    ":2000",
+		Handler: b.WebhookHandler(),
+	}
+	// Handle graceful shutdown
+	go func() {
+		<-ctx.Done()
+		log.Println("Shutting down webhook server...")
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Error during server shutdown: %v", err)
+		}
+	}()
+	err = server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
 		log.Printf("Failed to start webhook server: %v", err)
 		return err
 	}

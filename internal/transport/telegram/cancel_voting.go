@@ -2,15 +2,19 @@ package telegram
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
+	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
 	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/fsm"
 	"github.com/go-telegram/ui/paginator"
+	"github.com/hibiken/asynq"
 )
 
 const statePrepareCancelIDs fsm.StateID = "prepare_cancel_ids"
@@ -19,6 +23,7 @@ const stateCancel fsm.StateID = "cancel"
 type CancelVotingHandler struct {
 	f             *fsm.FSM
 	votingService service.IVotingService
+	inspector     *asynq.Inspector
 }
 
 type ICancelVotingHandler interface {
@@ -27,10 +32,11 @@ type ICancelVotingHandler interface {
 	Cancel(f *fsm.FSM, args ...any)
 }
 
-func NewCancelVotingHandler(f *fsm.FSM, votingService service.IVotingService) ICancelVotingHandler {
+func NewCancelVotingHandler(f *fsm.FSM, votingService service.IVotingService, inspector *asynq.Inspector) ICancelVotingHandler {
 	return &CancelVotingHandler{
 		f:             f,
 		votingService: votingService,
+		inspector:     inspector,
 	}
 }
 
@@ -40,12 +46,15 @@ func (h *CancelVotingHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if currentState != stateDefault {
 		return
 	}
-	votings, err := h.votingService.FindVotingByStatus("active")
+	votings, err := h.votingService.FindVotingByStatus(model.VOTING_ACTIVE_STATUS)
 	if err != nil || len(votings) == 0 {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Нет активных голосований.",
+			Text:   "ℹ️ Нет активных голосований.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	opts := []paginator.Option{
@@ -60,10 +69,13 @@ func (h *CancelVotingHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	showOpts := []paginator.ShowOption{}
 	paginatorMsg, err := p.Show(ctx, b, update.Message.Chat.ID, showOpts...)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при отображении голосований.",
+			Text:   "❌ Ошибка при отображении голосований.",
 		})
+		if err != nil {
+			log.Printf("Error sending message: %v", err)
+		}
 		return
 	}
 	fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
@@ -84,7 +96,7 @@ func (h *CancelVotingHandler) PrepareCancelIDs(f *fsm.FSM, args ...any) {
 	f.Set(userID, "paginatorMsgID", paginatorMsgID)
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Перечислите номера голосований, которые хотите отменить, через запятую.",
+		Text:   "📝 Перечислите номера голосований, которые хотите отменить, через запятую.",
 	})
 	if err != nil {
 		return
@@ -106,19 +118,56 @@ func (h *CancelVotingHandler) Cancel(f *fsm.FSM, args ...any) {
 		f.Reset(userID)
 		return
 	}
-	for _, id := range ids.([]int64) {
-		voting, err := h.votingService.UpdateVotingStatus(&model.Voting{ID: id, Status: "cancelled"})
+
+	votings, err := h.votingService.CancelByVotingID(ids.([]int64))
+	if err != nil {
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "❌ Ошибка при отмене голосований.",
+		})
 		if err != nil {
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.Message.Chat.ID,
-				Text:   fmt.Sprintf("Ошибка при отмене голосования с ID %d.", voting.ID),
-			})
+			log.Printf("Error sending message: %v", err)
+		}
+		f.Reset(userID)
+		return
+	}
+
+	for _, voting := range votings {
+		var taskId string
+		switch voting.Type {
+		case model.VOTING_RATING_TYPE:
+			taskId = fmt.Sprintf("%s-%d", tasks.CloseRatingVotingTaskType, voting.ID)
+		case model.VOTING_SELECTION_TYPE:
+			taskId = fmt.Sprintf("%s-%d", tasks.CloseSelectionVotingTaskType, voting.ID)
+		}
+		taskInfo, err := h.inspector.GetTaskInfo(tasks.QUEUE, taskId)
+		if err != nil {
 			continue
 		}
+		err = h.inspector.DeleteTask(taskInfo.Queue, taskInfo.ID)
+		if err != nil {
+			continue
+		}
+		var payload map[string]interface{}
+		err = json.Unmarshal([]byte(taskInfo.Payload), &payload)
+		if err != nil {
+			log.Printf("Error unmarshaling task payload: %v", err)
+			continue
+		}
+		_, err = b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    int64(payload["chat_id"].(float64)),
+			MessageID: int(payload["message_id"].(float64)),
+		})
+		if err != nil {
+			log.Printf("Error deleting message: %v", err)
+		}
 	}
-	b.SendMessage(ctx, &bot.SendMessageParams{
+	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Выбранные голосования были отменены.",
+		Text:   "✅ Выбранные голосования были отменены.",
 	})
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 	h.f.Reset(userID)
 }

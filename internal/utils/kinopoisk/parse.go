@@ -2,7 +2,7 @@ package kinopoisk
 
 import "regexp"
 
-var kinopoiskURL = regexp.MustCompile(`https://www.kinopoisk.ru/film/(\d+)/`)
+var kinopoiskURL = regexp.MustCompile(`https?://(?:www\.)?kinopoisk\.ru/film/(\d+)`)
 
 func ParseIDsOrRefs(rawString string) []string {
 	matches := kinopoiskURL.FindAllStringSubmatch(rawString, -1)

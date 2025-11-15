@@ -10,6 +10,7 @@ require (
 	github.com/go-telegram/bot v1.17.0 // indirect
 	github.com/go-telegram/fsm v0.2.0 // indirect
 	github.com/go-telegram/ui v0.5.1 // indirect
+	github.com/goodsign/monday v1.0.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hibiken/asynq v0.25.1 // indirect
 	github.com/ilyakaznacheev/cleanenv v1.5.0 // indirect

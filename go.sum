@@ -13,6 +13,8 @@ github.com/go-telegram/fsm v0.2.0 h1:Y9bG3SMouBQzBaT/HFhwvmnLZEgYkBPQHnKNZt0szO8
 github.com/go-telegram/fsm v0.2.0/go.mod h1:NTRDcTWUMJym2K67nBHjNrKO7oYm8/XNlU2cDs6Z3s0=
 github.com/go-telegram/ui v0.5.1 h1:5T71MHqTd9Y2ebhivIRHFanFvH5laaG6fQEVcZol+so=
 github.com/go-telegram/ui v0.5.1/go.mod h1:oInhKEPvNvVeEWSpiIIYXDSdapP1dgDjITD8bQ73e2c=
+github.com/goodsign/monday v1.0.2 h1:k8kRMkCRVfCTWOU4dRfRgneQsWlB1+mJd3MxG0lGLzQ=
+github.com/goodsign/monday v1.0.2/go.mod h1:r4T4breXpoFwspQNM+u2sLxJb2zyTaxVGqUfTBjWOu8=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/hibiken/asynq v0.25.1 h1:phj028N0nm15n8O2ims+IvJ2gz4k2auvermngh9JhTw=

@@ -11,13 +11,19 @@ type UpdateStatusParams struct {
 	Tx     *gorm.DB
 }
 
+type CreatePollParams struct {
+	Poll *model.Poll
+	Tx   *gorm.DB
+}
+
 type IPollRepo interface {
-	Create(poll *model.Poll) (*model.Poll, error)
+	Create(params *CreatePollParams) (*model.Poll, error)
 	CreatePollOption(option *model.PollOption) error
 	FindByPollID(pollID string) (*model.Poll, error)
-	FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error)
-	FindActivePolls() ([]model.Poll, error)
+	FindOpenedByMovieID(movieID int64) (*model.Poll, error)
+	FindPollOptionsByPollID(pollID int64) ([]*model.PollOption, error)
 	UpdateStatus(params *UpdateStatusParams) error
+	FindByVotingID(votingID int64) (*model.Poll, error)
 }
 
 type PollRepo struct {
@@ -28,36 +34,50 @@ func NewPollRepository(db *gorm.DB) IPollRepo {
 	return &PollRepo{db: db}
 }
 
-func (r *PollRepo) Create(poll *model.Poll) (*model.Poll, error) {
-	err := r.db.Create(poll).Error
-	return poll, err
+func (r *PollRepo) Create(params *CreatePollParams) (*model.Poll, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	err := tx.Create(params.Poll).Error
+	return params.Poll, err
 }
 
 func (r *PollRepo) CreatePollOption(option *model.PollOption) error {
 	return r.db.Create(option).Error
 }
 
-func (r *PollRepo) FindByPollID(pollID string) (*model.Poll, error) {
+func (r *PollRepo) FindByVotingID(votingID int64) (*model.Poll, error) {
 	var poll model.Poll
-	err := r.db.Preload("Voting").Preload("Movie").Where("poll_id = ? AND status = ?", pollID, "active").First(&poll).Error
+	err := r.db.Model(&model.Poll{}).Where("voting_id = ? AND status = ?", votingID, model.POLL_OPENED_STATUS).First(&poll).Error
 	return &poll, err
 }
 
-func (r *PollRepo) FindPollOptionsByPollID(pollID int64) ([]model.PollOption, error) {
-	var options []model.PollOption
+func (r *PollRepo) FindByPollID(pollID string) (*model.Poll, error) {
+	var poll model.Poll
+	err := r.db.Model(&model.Poll{}).Preload("Voting").Preload("Movie").Where("poll_id = ? AND status = ?", pollID, model.POLL_OPENED_STATUS).First(&poll).Error
+	return &poll, err
+}
+
+func (r *PollRepo) FindOpenedByMovieID(movieID int64) (*model.Poll, error) {
+	var poll model.Poll
+	err := r.db.Preload("Voting").Where("movie_id = ? AND status = ?", movieID, model.POLL_OPENED_STATUS).First(&poll).Error
+	if err != nil {
+		return nil, err
+	}
+	return &poll, nil
+}
+
+func (r *PollRepo) FindPollOptionsByPollID(pollID int64) ([]*model.PollOption, error) {
+	var options []*model.PollOption
 	err := r.db.Preload("Movie").Where("poll_id = ?", pollID).Order("option_index").Find(&options).Error
 	return options, err
 }
 
-func (r *PollRepo) FindActivePolls() ([]model.Poll, error) {
-	var polls []model.Poll
-	err := r.db.Preload("Voting").Preload("Movie").Where("status = ?", "active").Find(&polls).Error
-	return polls, err
-}
-
 func (r *PollRepo) UpdateStatus(params *UpdateStatusParams) error {
-	if params.Tx == nil {
-		params.Tx = r.db
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
 	}
-	return params.Tx.Model(&model.Poll{}).Where("poll_id = ?", params.PollID).Update("status", params.Status).Error
+	return tx.Model(&model.Poll{}).Where(&model.Poll{PollID: params.PollID}).Update("status", params.Status).Error
 }
