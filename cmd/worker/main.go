@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/app"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
@@ -16,21 +15,15 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	nodeEnv := os.Getenv("NODE_ENV")
-	redisClientOpts := asynq.RedisClientOpt{Addr: cfg.Redis.URL}
-	if nodeEnv == "PRODUCTION" {
-		redisClientOpts.Password = cfg.Redis.Password
-		redisClientOpts.Username = cfg.Redis.Username
-		redisClientOpts.DB = 0
+	connOpt, err := asynq.ParseRedisURI(cfg.Redis.URL)
+	if err != nil {
+		log.Fatalf("Failed to parse Redis URI: %v", err)
 	}
-
-	log.Printf("password: %s", redisClientOpts.Password)
-	log.Printf("username: %s", redisClientOpts.Username)
 
 	services := app.LoadServices(cfg)
 
 	srv := asynq.NewServer(
-		redisClientOpts,
+		connOpt,
 		asynq.Config{
 			// Specify how many concurrent workers to use
 			Concurrency: 10,
