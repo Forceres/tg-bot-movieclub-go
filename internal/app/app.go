@@ -33,6 +33,7 @@ const (
 	stateTime                  fsm.StateID = "time"
 	stateLocation              fsm.StateID = "location"
 	stateSaveSchedule          fsm.StateID = "save_schedule"
+	stateRescheduleSession     fsm.StateID = "reschedule_session"
 )
 
 func PollAnswerMatchFunc() bot.MatchFunc {
@@ -104,10 +105,10 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	registerUserHandler := telegram.NewRegisterUserHandler(services.UserService)
 	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
 	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
-	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f, services.ScheduleDatepicker)
+	scheduleHandler := telegram.NewScheduleHandler(services.ScheduleService, f, services.ScheduleDatepicker, services.SessionDatepicker)
 	cancelSessionHandler := telegram.NewCancelSessionHandler(services.SessionService, services.VotingService, services.AsynqInspector)
 	addsMovieHandler := telegram.NewAddsMovieHandler(services.MovieService, services.KinopoiskService, services.SessionService, services.PollService, services.AsynqClient, services.AsynqInspector)
-	rescheduleSessionHandler := telegram.NewResheduleSessionHandler(f, services.SessionDatepicker, services.SessionService, services.AsynqInspector, services.AsynqClient)
+	rescheduleSessionHandler := telegram.NewResheduleSessionHandler(f, services.SessionService, services.AsynqInspector, services.AsynqClient)
 
 	handlers := &Handlers{
 		HelpHandler:                 telegram.HelpHandler,
@@ -139,6 +140,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		stateTime:                  scheduleHandler.PrepareTime,
 		stateLocation:              scheduleHandler.PrepareLocation,
 		stateSaveSchedule:          scheduleHandler.SaveSchedule,
+		stateRescheduleSession:     rescheduleSessionHandler.RescheduleSession,
 	})
 
 	middlewares := &Middlewares{
@@ -224,7 +226,7 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandlerMatchFunc(telegram.UpdateChatMemberMatchFunc(), handlers.UpdateChatMemberHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "#перенос", bot.MatchTypeExact, handlers.RescheduleHandler, middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "#перенос", bot.MatchTypeExact, handlers.RescheduleSessionHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "help", bot.MatchTypeCommand, handlers.HelpHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "now", bot.MatchTypeCommand, handlers.CurrentMoviesHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "already", bot.MatchTypeCommand, handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
@@ -235,4 +237,5 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandler(bot.HandlerTypeMessageText, "register", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "schedule", bot.MatchTypeCommand, handlers.RescheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "adds", bot.MatchTypeCommand, handlers.AddsMovieHandler, middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "start", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
 }

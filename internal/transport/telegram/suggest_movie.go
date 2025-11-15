@@ -39,9 +39,9 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 		}
 		return
 	}
-	var idsToFind []int
+	var idsToFind []int64
 	for _, id := range ids {
-		intId, err := strconv.Atoi(id)
+		intId, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
 			continue
 		}

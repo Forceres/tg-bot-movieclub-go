@@ -67,7 +67,7 @@ func SessionDatepicker(b *bot.Bot, d *Datepicker) {
 	now := time.Now()
 	year := now.Year()
 	month := now.Month()
-	date := time.Date(year, month, 0, 0, 0, 0, 0, time.UTC)
+	date := time.Date(year, month, now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.UTC)
 	opts := []datepicker.Option{
 		datepicker.From(date),
 		datepicker.OnCancel(d.OnDatepickerCancel),

@@ -39,7 +39,7 @@ type IMovieService interface {
 	GetCurrentMovies() (*string, error)
 	GetAlreadyWatchedMovies() ([]string, error)
 	GetSuggestedOrWatchedMovies(suggested bool) ([][]string, error)
-	GetMovieByID(id int) (*model.Movie, error)
+	GetMovieByID(id int64) (*model.Movie, error)
 	Create(movie *MovieDTO, suggestedBy int64) error
 	Upsert(movie *MovieDTO, suggestedBy int64) error
 	generateHTMLForWatchedMovies(movies []*model.Movie) []string
@@ -91,7 +91,7 @@ func (s *MovieService) Create(movie *MovieDTO, suggestedBy int64) error {
 	return s.repo.Create(&newMovie)
 }
 
-func (s *MovieService) GetMovieByID(id int) (*model.Movie, error) {
+func (s *MovieService) GetMovieByID(id int64) (*model.Movie, error) {
 	movie, err := s.repo.GetMovieByID(id)
 	if err != nil {
 		return nil, err

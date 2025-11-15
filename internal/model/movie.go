@@ -9,7 +9,7 @@ const (
 
 type Movie struct {
 	gorm.Model
-	ID          int
+	ID          int64
 	Title       string
 	Description string
 	Directors   string

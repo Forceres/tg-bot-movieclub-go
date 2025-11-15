@@ -41,6 +41,8 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		return
 	case stateDate:
 		return
+	case stateRescheduleSession:
+		return
 	case statePrepareVotingTitle:
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		title := cases.Title(language.Russian).String(update.Message.Text)
@@ -203,7 +205,17 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			return
 		}
 		h.f.Set(userID, "location", location.String())
-		h.f.Transition(userID, stateSaveSchedule, userID, ctx, b, update)
+		value, ok := h.f.Get(userID, "datepicker")
+		var state fsm.StateID
+		if !ok {
+			return
+		}
+		if value == "session" {
+			state = stateRescheduleSession
+		} else {
+			state = stateSaveSchedule
+		}
+		h.f.Transition(userID, state, userID, ctx, b, update)
 	default:
 		fmt.Printf("unexpected state %s\n", currentState)
 	}

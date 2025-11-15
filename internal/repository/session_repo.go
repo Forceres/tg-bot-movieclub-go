@@ -8,7 +8,7 @@ import (
 
 type ConnectMoviesToSessionParams struct {
 	SessionID int64
-	MovieIDs  []int
+	MovieIDs  []int64
 	Tx        *gorm.DB
 }
 

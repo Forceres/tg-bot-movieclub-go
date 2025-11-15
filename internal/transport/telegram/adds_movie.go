@@ -74,8 +74,8 @@ func (h *AddsMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *model
 		return
 	}
 
-	var existingIDs []int
-	var lookupIDs []int
+	var existingIDs []int64
+	var lookupIDs []int64
 	for _, id := range movieIDs {
 		_, err := h.movieService.GetMovieByID(id)
 		if err != nil {
@@ -93,7 +93,7 @@ func (h *AddsMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *model
 		existingIDs = append(existingIDs, id)
 	}
 
-	var createdIDs []int
+	var createdIDs []int64
 	if len(lookupIDs) > 0 {
 		moviesDTO, err := h.kinopoiskService.SearchMovies(lookupIDs, update.Message.From.FirstName)
 		if err != nil {
@@ -166,7 +166,7 @@ func (h *AddsMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *model
 	})
 }
 
-func parseMovieIDs(raw string) ([]int, []string) {
+func parseMovieIDs(raw string) ([]int64, []string) {
 	candidates := kinopoisk.ParseIDsOrRefs(raw)
 	if len(candidates) == 0 {
 		for _, token := range strings.Fields(raw) {
@@ -176,11 +176,11 @@ func parseMovieIDs(raw string) ([]int, []string) {
 			}
 		}
 	}
-	seen := make(map[int]struct{})
-	var ids []int
+	seen := make(map[int64]struct{})
+	var ids []int64
 	var invalid []string
 	for _, candidate := range candidates {
-		id, err := strconv.Atoi(candidate)
+		id, err := strconv.ParseInt(candidate, 10, 64)
 		if err != nil {
 			invalid = append(invalid, candidate)
 			continue
@@ -194,7 +194,7 @@ func parseMovieIDs(raw string) ([]int, []string) {
 	return ids, invalid
 }
 
-func buildSuccessMessage(sessionID int64, existing, created []int) string {
+func buildSuccessMessage(sessionID int64, existing, created []int64) string {
 	var parts []string
 	if len(created) > 0 {
 		parts = append(parts, fmt.Sprintf("Добавлены новые фильмы: %v", created))
@@ -260,7 +260,7 @@ func (h *AddsMovieHandler) scheduleFinishSessionIfNeeded(session *model.Session,
 	}
 }
 
-func (h *AddsMovieHandler) scheduleCloseVotingTasks(update *models.Update, movieIDs []int, active map[string]struct{}, ok bool) {
+func (h *AddsMovieHandler) scheduleCloseVotingTasks(update *models.Update, movieIDs []int64, active map[string]struct{}, ok bool) {
 	if h.asynqClient == nil || h.pollService == nil || update.Message == nil || len(movieIDs) == 0 || h.redisUnavailable || !ok {
 		return
 	}

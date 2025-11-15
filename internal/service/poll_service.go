@@ -8,7 +8,7 @@ import (
 type IPollService interface {
 	CreatePollOption(option *model.PollOption) error
 	GetPollByPollID(pollID string) (*model.Poll, error)
-	GetOpenedPollByMovieID(movieID int) (*model.Poll, error)
+	GetOpenedPollByMovieID(movieID int64) (*model.Poll, error)
 	GetPollOptionsByPollID(pollID int64) ([]*model.PollOption, error)
 }
 
@@ -28,7 +28,7 @@ func (s *PollService) GetPollByPollID(pollID string) (*model.Poll, error) {
 	return s.pollRepo.FindByPollID(pollID)
 }
 
-func (s *PollService) GetOpenedPollByMovieID(movieID int) (*model.Poll, error) {
+func (s *PollService) GetOpenedPollByMovieID(movieID int64) (*model.Poll, error) {
 	return s.pollRepo.FindOpenedByMovieID(movieID)
 }
 

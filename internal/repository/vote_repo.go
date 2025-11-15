@@ -3,12 +3,14 @@ package repository
 import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type IVoteRepo interface {
 	Create(vote *model.Vote) error
+	Upsert(vote *model.Vote) error
 	CalculateRatingMean(votingID int64) (float64, error)
-	CalculateMaxMovieCount(votingID int64) (int64, int, error)
+	CalculateMaxMovieCount(votingID int64) (int64, int64, error)
 }
 
 type VoteRepo struct {
@@ -19,6 +21,15 @@ func NewVoteRepository(db *gorm.DB) *VoteRepo {
 	return &VoteRepo{db: db}
 }
 
+func (r *VoteRepo) Upsert(vote *model.Vote) error {
+	return r.db.Clauses(
+		clause.OnConflict{
+			UpdateAll: true,
+			Columns:   []clause.Column{{Name: "user_id"}, {Name: "voting_id"}},
+		},
+	).Create(&vote).Error
+}
+
 func (r *VoteRepo) Create(vote *model.Vote) error {
 	if err := r.db.Create(&vote).Error; err != nil {
 		return err
@@ -26,10 +37,10 @@ func (r *VoteRepo) Create(vote *model.Vote) error {
 	return nil
 }
 
-func (r *VoteRepo) CalculateMaxMovieCount(votingID int64) (int64, int, error) {
+func (r *VoteRepo) CalculateMaxMovieCount(votingID int64) (int64, int64, error) {
 	var result struct {
 		MovieCount int64
-		MovieID    int
+		MovieID    int64
 	}
 	err := r.db.Model(&model.Vote{}).
 		Select("COUNT(*) as movie_count, movie_id").

@@ -22,7 +22,7 @@ type Genre struct {
 }
 
 type KinopoiskMovie struct {
-	KinopoiskID                int       `json:"kinopoiskId"`
+	KinopoiskID                int64     `json:"kinopoiskId"`
 	KinopoiskHDID              string    `json:"kinopoiskHDId"`
 	ImdbID                     string    `json:"imdbId"`
 	NameRu                     *string   `json:"nameRu"`
@@ -101,9 +101,9 @@ func NewKinopoiskAPI(cfg *config.KinopoiskConfig, client *http.Client) *Kinopois
 }
 
 type IKinopoiskAPI interface {
-	SearchMovie(id int) (*KinopoiskMovie, error)
-	SearchMovies(ids []int) (*[]KinopoiskMovieWithStaff, error)
-	SearchStaff(movieId int) (*[]KinopoiskStaff, error)
+	SearchMovie(id int64) (*KinopoiskMovie, error)
+	SearchMovies(ids []int64) (*[]KinopoiskMovieWithStaff, error)
+	SearchStaff(movieId int64) (*[]KinopoiskStaff, error)
 	APIGetCall(url string) ([]byte, error)
 }
 
@@ -129,7 +129,7 @@ func (k *KinopoiskAPI) APIGetCall(url string) ([]byte, error) {
 	return body, nil
 }
 
-func (k *KinopoiskAPI) SearchMovie(movieId int) (*KinopoiskMovie, error) {
+func (k *KinopoiskAPI) SearchMovie(movieId int64) (*KinopoiskMovie, error) {
 	var url string = fmt.Sprintf(k.APIUrl, k.APIVersion) + fmt.Sprintf(MOVIES+"/%d", movieId)
 	body, err := k.APIGetCall(url)
 	if err != nil {
@@ -145,7 +145,7 @@ func (k *KinopoiskAPI) SearchMovie(movieId int) (*KinopoiskMovie, error) {
 	return &movie, nil
 }
 
-func (k *KinopoiskAPI) SearchMovies(ids []int) (*[]KinopoiskMovieWithStaff, error) {
+func (k *KinopoiskAPI) SearchMovies(ids []int64) (*[]KinopoiskMovieWithStaff, error) {
 	var responses []KinopoiskMovieWithStaff
 	for _, id := range ids {
 		movie, err := k.SearchMovie(id)
@@ -167,7 +167,7 @@ func (k *KinopoiskAPI) SearchMovies(ids []int) (*[]KinopoiskMovieWithStaff, erro
 	return &responses, nil
 }
 
-func (k *KinopoiskAPI) SearchStaff(movieId int) (*[]KinopoiskStaff, error) {
+func (k *KinopoiskAPI) SearchStaff(movieId int64) (*[]KinopoiskStaff, error) {
 	var url string = fmt.Sprintf(k.APIUrl+"%s?filmId=%d", "v1", STAFF, movieId)
 	var staff []KinopoiskStaff
 	body, err := k.APIGetCall(url)

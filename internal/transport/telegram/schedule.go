@@ -23,9 +23,10 @@ const (
 )
 
 type ScheduleHandler struct {
-	f               *fsm.FSM
-	scheduleService service.IScheduleService
-	datepicker      *datepicker.Datepicker
+	f                 *fsm.FSM
+	scheduleService   service.IScheduleService
+	datepicker        *datepicker.Datepicker
+	sessionDatepicker *datepicker.Datepicker
 }
 
 type IScheduleHandler interface {
@@ -37,8 +38,8 @@ type IScheduleHandler interface {
 	SaveSchedule(f *fsm.FSM, args ...any)
 }
 
-func NewScheduleHandler(scheduleService service.IScheduleService, f *fsm.FSM, datepicker *datepicker.Datepicker) IScheduleHandler {
-	return &ScheduleHandler{scheduleService: scheduleService, f: f, datepicker: datepicker}
+func NewScheduleHandler(scheduleService service.IScheduleService, f *fsm.FSM, datepicker *datepicker.Datepicker, sessionDatepicker *datepicker.Datepicker) IScheduleHandler {
+	return &ScheduleHandler{scheduleService: scheduleService, f: f, datepicker: datepicker, sessionDatepicker: sessionDatepicker}
 }
 
 func (h *ScheduleHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -97,9 +98,18 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	update := args[3].(*models.Update)
+	// reschedule_session
+	var title string
+	dp, _ := f.Get(userID, "datepicker")
+	if dp == "session" {
+		title = "Обновление даты сессии..."
+	} else {
+		title = "Изменение расписания..."
+	}
+	//
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Изменение расписания...",
+		Text:   title,
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -107,10 +117,16 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 		return
 	}
 	fsmutils.AppendMessageID(f, userID, msg.ID)
+	var datepicker *datepicker.Datepicker
+	if dp == "session" {
+		datepicker = h.sessionDatepicker
+	} else {
+		datepicker = h.datepicker
+	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
 		Text:        "Выбери дату",
-		ReplyMarkup: h.datepicker.Datepicker,
+		ReplyMarkup: datepicker.Datepicker,
 	})
 	if err != nil {
 		log.Printf("Error sending datepicker: %v", err)

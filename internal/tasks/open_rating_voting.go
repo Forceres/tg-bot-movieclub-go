@@ -107,6 +107,7 @@ func (t *OpenRatingVotingTaskProcessor) Process(ctx context.Context, task *asynq
 			CreatedBy:  p.UserID,
 			FinishedAt: &finishedAt,
 			MovieID:    &p.Movie.ID,
+			SessionID:  &p.SessionID,
 		},
 		PollOptions: RATING_VOTING_OPTIONS,
 		Question:    title,

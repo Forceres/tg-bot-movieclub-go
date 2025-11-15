@@ -13,7 +13,7 @@ import (
 type ISessionService interface {
 	FinishSession(sessionID int64) error
 	CancelSession() (*model.Session, error)
-	AddMoviesToSession(createdBy int64, movieIDs []int) (*model.Session, []int, bool, error)
+	AddMoviesToSession(createdBy int64, movieIDs []int64) (*model.Session, []int64, bool, error)
 	FindOngoingSession() (*model.Session, error)
 	RescheduleSession(sessionID int64, finishedAt int64) error
 	FindOrCreateSession(finishedAt int64, createdAt int64) (*model.Session, bool, error)
@@ -77,13 +77,13 @@ func (s *SessionService) FinishSession(sessionID int64) error {
 	return nil
 }
 
-func (s *SessionService) AddMoviesToSession(createdBy int64, movieIDs []int) (*model.Session, []int, bool, error) {
+func (s *SessionService) AddMoviesToSession(createdBy int64, movieIDs []int64) (*model.Session, []int64, bool, error) {
 	if len(movieIDs) == 0 {
 		return nil, nil, false, fmt.Errorf("movieIDs cannot be empty")
 	}
 	unique := uniqueInts(movieIDs)
 	var session *model.Session
-	var newMovieIDs []int
+	var newMovieIDs []int64
 	var sessionCreated bool
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
 		var err error
@@ -119,7 +119,7 @@ func (s *SessionService) AddMoviesToSession(createdBy int64, movieIDs []int) (*m
 		if err := tx.Model(session).Association("Movies").Find(&existingMovies); err != nil {
 			return err
 		}
-		existing := make(map[int]struct{}, len(existingMovies))
+		existing := make(map[int64]struct{}, len(existingMovies))
 		for _, movie := range existingMovies {
 			existing[movie.ID] = struct{}{}
 		}
@@ -152,9 +152,9 @@ func (s *SessionService) AddMoviesToSession(createdBy int64, movieIDs []int) (*m
 	return session, newMovieIDs, sessionCreated, nil
 }
 
-func uniqueInts(values []int) []int {
-	seen := make(map[int]struct{}, len(values))
-	result := make([]int, 0, len(values))
+func uniqueInts(values []int64) []int64 {
+	seen := make(map[int64]struct{}, len(values))
+	result := make([]int64, 0, len(values))
 	for _, value := range values {
 		if _, ok := seen[value]; ok {
 			continue

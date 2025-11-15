@@ -7,7 +7,7 @@ import (
 )
 
 type MovieDTO struct {
-	KinopoiskID int      `json:"kinopoisk_id"`
+	KinopoiskID int64    `json:"kinopoisk_id"`
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Directors   []string `json:"director"`
@@ -25,7 +25,7 @@ type KinopoiskService struct {
 }
 
 type IKinopoiskService interface {
-	SearchMovies(ids []int, suggestedBy string) ([]MovieDTO, error)
+	SearchMovies(ids []int64, suggestedBy string) ([]MovieDTO, error)
 	ParseMovies(response *[]kinopoisk.KinopoiskMovieWithStaff, suggestedBy *string) ([]MovieDTO, error)
 }
 
@@ -35,7 +35,7 @@ func NewKinopoiskService(kinopoiskAPI kinopoisk.IKinopoiskAPI) *KinopoiskService
 	}
 }
 
-func (s *KinopoiskService) SearchMovies(ids []int, suggestedBy string) ([]MovieDTO, error) {
+func (s *KinopoiskService) SearchMovies(ids []int64, suggestedBy string) ([]MovieDTO, error) {
 	movies, err := s.kinopoiskAPI.SearchMovies(ids)
 	if err != nil {
 		return nil, err

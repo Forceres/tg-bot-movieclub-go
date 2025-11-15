@@ -7,8 +7,9 @@ import (
 
 type IVoteService interface {
 	Create(vote *model.Vote) error
+	Upsert(vote *model.Vote) error
 	CalculateRatingMean(votingID int64) (float64, error)
-	CalculateMaxMovieCount(votingID int64) (int64, int, error)
+	CalculateMaxMovieCount(votingID int64) (int64, int64, error)
 }
 
 type VoteService struct {
@@ -19,11 +20,15 @@ func NewVoteService(repo repository.IVoteRepo) *VoteService {
 	return &VoteService{repo: repo}
 }
 
+func (s *VoteService) Upsert(vote *model.Vote) error {
+	return s.repo.Upsert(vote)
+}
+
 func (s *VoteService) CalculateRatingMean(votingID int64) (float64, error) {
 	return s.repo.CalculateRatingMean(votingID)
 }
 
-func (s *VoteService) CalculateMaxMovieCount(votingID int64) (int64, int, error) {
+func (s *VoteService) CalculateMaxMovieCount(votingID int64) (int64, int64, error) {
 	return s.repo.CalculateMaxMovieCount(votingID)
 }
 

@@ -265,7 +265,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 	switch votingType.(string) {
 	case SELECTION_TYPE:
 		movies, _ := f.Get(userID, "movies")
-		movieIDs := []int{}
+		movieIDs := []int64{}
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		pollOpts := []models.InputPollOption{}
 		for _, index := range selectedMovieIndexes.([]int64) {
@@ -273,7 +273,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			if movieData == nil {
 				continue
 			}
-			movieID, err := strconv.Atoi((*movieData)[0])
+			movieID, err := strconv.ParseInt((*movieData)[0], 10, 64)
 			if err != nil {
 				log.Printf("Error converting movie ID: %v", err)
 				continue
@@ -317,6 +317,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			MessageID: poll.MessageID,
 			ChatID:    update.Message.Chat.ID,
 			VotingID:  poll.VotingID,
+			UserID:    userID,
 		})
 		if err != nil {
 			log.Printf("Error scheduling close rating voting task: %v", err)
@@ -329,7 +330,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			if movieData == nil {
 				continue
 			}
-			movieID, _ := strconv.Atoi((*movieData)[0])
+			movieID, _ := strconv.ParseInt((*movieData)[0], 10, 64)
 			title := fmt.Sprintf("Оцените фильм: %s", (*movieData)[1])
 			poll, err := h.votingService.StartVoting(&service.StartRatingVotingParams{
 				Bot:     b,
@@ -357,6 +358,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				ChatID:    update.Message.Chat.ID,
 				VotingID:  poll.VotingID,
 				MovieID:   movieID,
+				UserID:    userID,
 			})
 			if err != nil {
 				log.Printf("Error scheduling close rating voting task: %v", err)

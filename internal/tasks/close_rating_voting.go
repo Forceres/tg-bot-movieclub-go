@@ -28,11 +28,11 @@ type CloseRatingVotingPayload struct {
 	MessageID int    `json:"message_id"`
 	ChatID    int64  `json:"chat_id"`
 	VotingID  int64  `json:"voting_id"`
-	MovieID   int    `json:"movie_id"`
+	MovieID   int64  `json:"movie_id"`
 	UserID    int64  `json:"user_id"`
 }
 
-func NewCloseRatingVotingTask(pollID string, messageID int, chatID int64, votingID int64, movieID int) (*asynq.Task, error) {
+func NewCloseRatingVotingTask(pollID string, messageID int, chatID int64, votingID int64, movieID int64) (*asynq.Task, error) {
 	payload, err := json.Marshal(CloseRatingVotingPayload{PollID: pollID, MessageID: messageID, ChatID: chatID, VotingID: votingID, MovieID: movieID})
 	if err != nil {
 		return nil, err

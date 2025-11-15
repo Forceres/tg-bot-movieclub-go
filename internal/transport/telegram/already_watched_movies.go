@@ -52,6 +52,16 @@ func (h *AlreadyWatchedMoviesHandler) Handle(ctx context.Context, b *bot.Bot, up
 		}
 		return
 	}
+	if len(formattedMovies) == 0 {
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "Список просмотренных фильмов пуст.",
+		})
+		if err != nil {
+			log.Printf("Error sending empty list message: %v", err)
+		}
+		return
+	}
 
 	if data.LastPageURL == "" {
 		h.handleNewPages(ctx, b, update, data, formattedMovies)

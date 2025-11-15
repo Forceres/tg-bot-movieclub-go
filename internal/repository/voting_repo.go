@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
@@ -55,6 +56,7 @@ func (r *VotingRepo) CreateVoting(params *CreateVotingParams) (*model.Voting, er
 		tx = params.Tx
 	}
 	voting := params.Voting
+	fmt.Printf("Voting created by: %d; movieId: %d; sessionId: %d\n", voting.CreatedBy, voting.MovieID, voting.SessionID)
 	if err := tx.Create(voting).Error; err != nil {
 		return nil, err
 	}

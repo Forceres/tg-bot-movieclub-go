@@ -14,14 +14,14 @@ import (
 type FinishSelectionVotingParams struct {
 	VotingID  int64
 	PollID    string
-	MovieID   int
+	MovieID   int64
 	CreatedBy int64
 }
 
 type FinishRatingVotingParams struct {
 	VotingID  int64
 	PollID    string
-	MovieID   int
+	MovieID   int64
 	Mean      float64
 	CreatedBy int64
 }
@@ -31,7 +31,7 @@ type VotingOptions struct {
 	Type       string
 	CreatedBy  int64
 	FinishedAt *int64
-	MovieID    *int
+	MovieID    *int64
 	SessionID  *int64
 }
 
@@ -135,7 +135,7 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 		}
 		err = s.sessionRepo.ConnectMoviesToSession(&repository.ConnectMoviesToSessionParams{
 			SessionID: session.ID,
-			MovieIDs:  []int{params.MovieID},
+			MovieIDs:  []int64{params.MovieID},
 			Tx:        tx,
 		})
 		if err != nil {
@@ -177,7 +177,7 @@ func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Pol
 		}
 		pollMsg, err := params.Bot.SendPoll(params.Context, &bot.SendPollParams{
 			ChatID:            params.ChatID,
-			Question:          params.Question,
+			Question:          bot.EscapeMarkdownUnescaped(params.Question),
 			Options:           params.PollOptions,
 			IsAnonymous:       bot.False(),
 			Type:              "regular",
@@ -193,7 +193,7 @@ func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Pol
 			MessageID: pollMsg.ID,
 			VotingID:  createdVoting.ID,
 			Type:      params.Options.Type,
-			Status:    "active",
+			Status:    model.POLL_OPENED_STATUS,
 		}
 
 		if params.Options.MovieID != nil {

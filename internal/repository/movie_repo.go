@@ -7,13 +7,13 @@ import (
 )
 
 type UpdateRatingParams struct {
-	MovieID int
+	MovieID int64
 	Rating  float64
 	Tx      *gorm.DB
 }
 
 type UpdateDatesParams struct {
-	MovieID   int
+	MovieID   int64
 	StartedAt *string
 	Tx        *gorm.DB
 }
@@ -27,7 +27,7 @@ type IMovieRepo interface {
 	GetCurrentMovies() ([]*model.Movie, error)
 	GetAlreadyWatchedMovies() ([]*model.Movie, error)
 	GetSuggestedMovies() ([]*model.Movie, error)
-	GetMovieByID(id int) (*model.Movie, error)
+	GetMovieByID(id int64) (*model.Movie, error)
 	Create(movie *model.Movie) error
 	Update(params *UpdateParams) error
 	UpdateRating(params *UpdateRatingParams) error
@@ -68,7 +68,7 @@ func (r *MovieRepo) UpdateRating(params *UpdateRatingParams) error {
 	return tx.Model(&model.Movie{ID: params.MovieID}).Update("rating", params.Rating).Error
 }
 
-func (r *MovieRepo) GetMovieByID(id int) (*model.Movie, error) {
+func (r *MovieRepo) GetMovieByID(id int64) (*model.Movie, error) {
 	var movie model.Movie
 	if err := r.db.Model(&model.Movie{}).Where(&model.Movie{ID: id}).First(&movie).Error; err != nil {
 		return nil, err
