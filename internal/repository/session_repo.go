@@ -47,6 +47,8 @@ type ISessionRepo interface {
 	Transaction(fc func(tx *gorm.DB) error) error
 	Create(params *CreateSessionParams) (*model.Session, error)
 	DisconnectMoviesFromSession(params *DisconnectMoviesFromSessionParams) error
+	FindByID(sessionID int64) (*model.Session, error)
+	Update(session *model.Session) error
 }
 
 type SessionRepo struct {
@@ -67,7 +69,7 @@ func (r *SessionRepo) RescheduleSession(sessionID int64, finishedAt int64) error
 
 func (r *SessionRepo) FindOngoingSession() (*model.Session, error) {
 	var session model.Session
-	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Preload("Movies").First(&session).Error
+	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Preload("Movies").Preload("Movies.Suggester").First(&session).Error
 	if err != nil {
 		return nil, err
 	}
@@ -172,4 +174,17 @@ func (r *SessionRepo) Create(params *CreateSessionParams) (*model.Session, error
 	}
 	err := tx.Create(params.Session).Error
 	return params.Session, err
+}
+
+func (r *SessionRepo) FindByID(sessionID int64) (*model.Session, error) {
+	var session model.Session
+	err := r.db.Preload("Movies").Preload("Votings").First(&session, sessionID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *SessionRepo) Update(session *model.Session) error {
+	return r.db.Save(session).Error
 }

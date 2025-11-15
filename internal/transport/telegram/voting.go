@@ -261,7 +261,6 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 	duration, _ := h.fsm.Get(userID, "duration")
 	votingType, _ := h.fsm.Get(userID, "type")
 	title, _ := h.fsm.Get(userID, "title")
-	// time hour
 	finishedAt := time.Now().Add(time.Duration(duration.(int)) * time.Hour).Unix()
 	switch votingType.(string) {
 	case SELECTION_TYPE:

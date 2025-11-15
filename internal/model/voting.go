@@ -6,15 +6,15 @@ const (
 	VOTING_ACTIVE_STATUS    = "ACTIVE"
 	VOTING_INACTIVE_STATUS  = "INACTIVE"
 	VOTING_CANCELLED_STATUS = "CANCELLED"
-	VOTING_RATING_TYPE      = "rating"
-	VOTING_SELECTION_TYPE   = "selection"
+	VOTING_RATING_TYPE      = "RATING"
+	VOTING_SELECTION_TYPE   = "SELECTION"
 )
 
 type Voting struct {
 	gorm.Model
 	ID         int64  `gorm:"primaryKey"`
 	Title      string `gorm:"not null"`
-	Type       string `gorm:"not null;check:type IN ('selection', 'rating')"` // selection or rating
+	Type       string `gorm:"not null;check:type IN ('SELECTION', 'RATING')"` // selection or rating
 	Status     string `gorm:"default:'ACTIVE'"`
 	FinishedAt *int64
 	MovieID    *int64

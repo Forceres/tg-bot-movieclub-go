@@ -45,6 +45,36 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		return
 	case stateRemove:
 		return
+	case stateSaveDescription:
+		return
+	case stateDescription:
+		_, exists := h.f.Get(userID, "session_id")
+		if !exists {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: update.Message.Chat.ID,
+				Text:   "❌ Ошибка: сессия не найдена. Попробуйте снова с /custom.",
+			})
+			h.f.Reset(userID)
+			return
+		}
+		description := strings.TrimSpace(update.Message.Text)
+		if description == "" {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: update.Message.Chat.ID,
+				Text:   "❌ Описание не может быть пустым. Попробуйте еще раз или отправьте /cancel.",
+			})
+			return
+		}
+		if len(description) > 500 {
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: update.Message.Chat.ID,
+				Text:   "❌ Описание слишком длинное (максимум 500 символов). Попробуйте сократить.",
+			})
+			return
+		}
+		h.f.Set(userID, "description", description)
+		h.f.Transition(userID, stateSaveDescription, userID, ctx, b, update)
+		return
 	case statePrepareVotingTitle:
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		title := cases.Title(language.Russian).String(update.Message.Text)

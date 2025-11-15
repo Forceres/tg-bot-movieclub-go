@@ -17,6 +17,7 @@ type ISessionService interface {
 	FindOngoingSession() (*model.Session, error)
 	RescheduleSession(sessionID int64, finishedAt int64) error
 	RemoveMoviesFromSession(movieIDs []int64, sessionID int64) ([]*model.Voting, error)
+	UpdateSessionDescription(sessionID int64, description string) error
 }
 
 type SessionService struct {
@@ -190,6 +191,16 @@ func (s *SessionService) AddMoviesToSession(createdBy int64, movieIDs []int64) (
 		return nil, nil, false, err
 	}
 	return session, newMovieIDs, sessionCreated, nil
+}
+
+func (s *SessionService) UpdateSessionDescription(sessionID int64, description string) error {
+	session, err := s.repo.FindByID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	session.Description = description
+	return s.repo.Update(session)
 }
 
 func uniqueInts(values []int64) []int64 {

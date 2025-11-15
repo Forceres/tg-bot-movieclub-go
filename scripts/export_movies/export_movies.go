@@ -4,35 +4,12 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/ilyakaznacheev/cleanenv"
-	"gorm.io/gorm"
 )
-
-type MovieExport struct {
-	gorm.Model
-	ID          int64   `json:"id"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Director    string  `json:"director"`
-	Year        int     `json:"year"`
-	Countries   string  `json:"countries"`
-	Genres      string  `json:"genres"`
-	Link        string  `json:"link"`
-	Duration    int     `json:"duration"`
-	IMDBRating  float64 `json:"imdb_rating"`
-	Rating      float64 `json:"rating"`
-	StartWatch  string  `json:"start_watch"`
-	FinishWatch string  `json:"finish_watch"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
-	SuggestedAt string  `json:"suggested_at"`
-	SuggestedBy string  `json:"suggested_by"`
-}
 
 func main() {
 	var cfg config.Config
@@ -45,22 +22,15 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	var movies []MovieExport
+	var movies []model.Movie
 	if err := database.Table("movies").Find(&movies).Error; err != nil {
 		log.Fatalf("Failed to fetch movies: %v", err)
 	}
 
-	// Map to export format
 	var moviesExport []model.Movie
 	for _, movie := range movies {
-		suggestedAtTime, err := time.Parse("2006-01-02T15:04:05", movie.SuggestedAt)
-		if err != nil {
-			log.Printf("Failed to parse SuggestedAt for movie ID %d: %v", movie.ID, err)
-			suggestedAtTime = time.Time{}
-		}
-		suggestedAtUnix := suggestedAtTime.Unix()
 		var suggestedAt *int64
-		if suggestedAtUnix < 0 {
+		if movie.SuggestedAt != nil && *movie.SuggestedAt < 0 {
 			suggestedAt = nil
 		}
 		moviesExport = append(moviesExport, model.Movie{
@@ -68,16 +38,18 @@ func main() {
 			Title:       movie.Title,
 			Year:        movie.Year,
 			Description: movie.Description,
-			Directors:   movie.Director,
+			Directors:   movie.Directors,
 			Countries:   movie.Countries,
 			Genres:      movie.Genres,
 			Link:        movie.Link,
 			IMDBRating:  movie.IMDBRating,
 			Rating:      movie.Rating,
 			SuggestedAt: suggestedAt,
-			Status:      "watched",
+			SuggestedBy: movie.SuggestedBy,
+			Status:      movie.Status,
 			Duration:    movie.Duration,
-			FinishedAt:  &movie.FinishWatch, // Map from FinishWatch
+			WatchCount:  movie.WatchCount,
+			FinishedAt:  movie.FinishedAt, // Map from FinishedAt
 		})
 	}
 
