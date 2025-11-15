@@ -21,7 +21,6 @@ services:
       - NODE_ENV=PRODUCTION
       - DOMAIN_ADDRESS=${DOMAIN_ADDRESS}
     volumes:
-      - bot_data:/root/data
       - /root/data/db.sqlite3:/root/data/db.sqlite3:rw
     networks:
       - movieclub-network
@@ -48,7 +47,6 @@ services:
       - KINOPOISK_API_KEY=${KINOPOISK_API_KEY}
       - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
     volumes:
-      - bot_data:/root/data
       - /root/data/db.sqlite3:/root/data/db.sqlite3:rw
     networks:
       - movieclub-network
@@ -57,10 +55,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  bot_data:
-    driver: local
 
 networks:
   movieclub-network:
