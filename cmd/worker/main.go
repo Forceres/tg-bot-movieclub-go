@@ -21,9 +21,11 @@ func main() {
 	if nodeEnv == "PRODUCTION" {
 		redisClientOpts.Password = cfg.Redis.Password
 		redisClientOpts.Username = cfg.Redis.Username
+		redisClientOpts.DB = 0
 	}
 
-	log.Printf("%v", redisClientOpts)
+	log.Printf("password: %s", redisClientOpts.Password)
+	log.Printf("username: %s", redisClientOpts.Username)
 
 	services := app.LoadServices(cfg)
 
