@@ -9,9 +9,6 @@ services:
         BUILD_TARGET: bot
     container_name: movieclub-bot
     restart: unless-stopped
-    depends_on:
-      redis:
-        condition: service_healthy
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_GROUP_ID=${TELEGRAM_GROUP_ID}
@@ -43,9 +40,6 @@ services:
         BUILD_TARGET: worker
     container_name: movieclub-worker
     restart: unless-stopped
-    depends_on:
-      redis:
-        condition: service_healthy
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_GROUP_ID=${TELEGRAM_GROUP_ID}
