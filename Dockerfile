@@ -13,7 +13,7 @@ COPY . .
 
 ARG BUILD_TARGET=bot
 
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o /app/bin/${BUILD_TARGET} ./cmd/${BUILD_TARGET}
+RUN CGO_ENABLED=1 GOOS=linux go build -o /app/bin/${BUILD_TARGET} ./cmd/${BUILD_TARGET}
 
 # Runtime stage
 FROM alpine:latest
