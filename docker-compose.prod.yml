@@ -39,7 +39,6 @@ services:
       - DOMAIN_ADDRESS=${DOMAIN_ADDRESS}
     volumes:
       - bot_data:/root/data
-      - ./db.sqlite:/root/data/db.sqlite3
     networks:
       - movieclub-network
     logging:
@@ -69,7 +68,6 @@ services:
       - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
     volumes:
       - bot_data:/root/data
-      - ./db.sqlite:/root/data/db.sqlite3
     networks:
       - movieclub-network
     logging:
