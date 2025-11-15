@@ -6,6 +6,7 @@ import (
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type FinishVotingParams struct {
@@ -18,6 +19,11 @@ type CreateVotingParams struct {
 	Tx     *gorm.DB
 }
 
+type CancelVotingsBySessionIDParams struct {
+	SessionID int64
+	Tx        *gorm.DB
+}
+
 type IVotingRepo interface {
 	Transaction(txFunc func(tx *gorm.DB) error) error
 	CreateVoting(params *CreateVotingParams) (*model.Voting, error)
@@ -26,6 +32,7 @@ type IVotingRepo interface {
 	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
 	FinishVoting(params *FinishVotingParams) error
 	FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error)
+	CancelVotingsBySessionID(params *CancelVotingsBySessionIDParams) ([]*model.Voting, error)
 }
 
 type VotingRepo struct {
@@ -40,6 +47,23 @@ func NewVotingRepository(db *gorm.DB, pollRepo IPollRepo, movieRepo IMovieRepo) 
 
 func (r *VotingRepo) Transaction(txFunc func(tx *gorm.DB) error) error {
 	return r.db.Transaction(txFunc)
+}
+
+func (r *VotingRepo) CancelVotingsBySessionID(params *CancelVotingsBySessionIDParams) ([]*model.Voting, error) {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	updates := map[string]interface{}{
+		"status":      model.VOTING_CANCELLED_STATUS,
+		"finished_at": time.Now().Unix(),
+	}
+	votings := []*model.Voting{}
+	err := tx.Model(&model.Voting{}).Clauses(clause.Returning{}).Where(&model.Voting{SessionID: &params.SessionID}).Updates(updates).Find(&votings).Error
+	if err != nil {
+		return nil, err
+	}
+	return votings, nil
 }
 
 func (r *VotingRepo) FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error) {

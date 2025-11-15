@@ -43,6 +43,8 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		return
 	case stateRescheduleSession:
 		return
+	case stateRemove:
+		return
 	case statePrepareVotingTitle:
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		title := cases.Title(language.Russian).String(update.Message.Text)
@@ -155,6 +157,66 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		}
 		h.f.Set(userID, "votingIDs", votingIDs)
 		h.f.Transition(userID, stateCancel, userID, ctx, b, update)
+	case statePrepareMoviesToDelete:
+		idxs := update.Message.Text
+		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
+		indexes := []int64{}
+		movies, ok := h.f.Get(userID, "movies")
+		if !ok {
+			h.f.Reset(userID)
+			return
+		}
+		iter := strings.SplitSeq(idxs, ",")
+		unique := make(map[int64]struct{})
+		for id := range iter {
+			idx, err := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
+			if err == nil {
+				if _, exists := unique[idx]; exists {
+					continue
+				}
+				if idx <= 0 || idx > int64(len(movies.([]model.Movie))) {
+					continue
+				}
+				unique[idx] = struct{}{}
+				indexes = append(indexes, idx)
+			}
+		}
+		if len(indexes) == 0 {
+			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: chatID,
+				Text:   "Введите корректные целые числа через запятую",
+			})
+			if err != nil {
+				log.Printf("Error sending message: %v", err)
+				return
+			}
+			fsmutils.AppendMessageID(h.f, userID, msg.ID)
+			return
+		}
+
+		movieIDs := []int64{}
+		for _, idx := range indexes {
+			for movieIdx, movie := range movies.([]model.Movie) {
+				if int64(movieIdx+1) == idx {
+					movieIDs = append(movieIDs, movie.ID)
+				}
+			}
+		}
+		paginatorMsgID, ok := h.f.Get(userID, "paginatorMsgID")
+		if !ok {
+			h.f.Reset(userID)
+			return
+		}
+		ok, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: paginatorMsgID.(int),
+		})
+		if err != nil || !ok {
+			h.f.Reset(userID)
+			return
+		}
+		h.f.Set(userID, "movieIDs", movieIDs)
+		h.f.Transition(userID, stateRemove, userID, ctx, b, update)
 	case stateTime:
 		timeString := update.Message.Text
 		var hour *int

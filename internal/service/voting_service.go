@@ -45,13 +45,11 @@ type StartRatingVotingParams struct {
 }
 
 type IVotingService interface {
-	UpdateVotingStatus(voting *model.Voting) (*model.Voting, error)
 	FindVotingByStatus(status string) ([]*model.Voting, error)
 	FinishRatingVoting(params *FinishRatingVotingParams) error
 	FinishSelectionVoting(params *FinishSelectionVotingParams) (*model.Session, bool, error)
 	StartVoting(params *StartRatingVotingParams) (*model.Poll, error)
-	FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error)
-	CancelByVotingID(votingID int64) (*model.Voting, error)
+	CancelByVotingID(votingIDs []int64) ([]*model.Voting, error)
 }
 
 type VotingService struct {
@@ -66,44 +64,44 @@ func NewVotingService(repo repository.IVotingRepo, scheduleService IScheduleServ
 	return &VotingService{repo: repo, scheduleService: scheduleService, sessionRepo: sessionRepo, movieRepo: movieRepo, pollRepo: pollRepo}
 }
 
-func (s *VotingService) FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error) {
-	return s.repo.FindVotingsBySessionID(sessionID)
-}
-
-func (s *VotingService) CancelByVotingID(votingID int64) (*model.Voting, error) {
-	var voting *model.Voting
+func (s *VotingService) CancelByVotingID(votingIDs []int64) ([]*model.Voting, error) {
+	var votings []*model.Voting
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
 		var err error
-		voting, err = s.repo.FindVotingByID(votingID)
-		if err != nil {
-			return err
-		}
-		if voting.Status != model.VOTING_ACTIVE_STATUS {
-			return nil
-		}
-		voting.Status = model.VOTING_CANCELLED_STATUS
-		_, err = s.repo.UpdateVotingStatus(voting)
-		if err != nil {
-			return err
-		}
-		poll, err := s.pollRepo.FindByVotingID(votingID)
-		if err != nil {
-			return err
-		}
-		err = s.pollRepo.UpdateStatus(&repository.UpdateStatusParams{
-			PollID: poll.PollID,
-			Status: model.POLL_CLOSED_STATUS,
-			Tx:     tx,
-		})
-		if err != nil {
-			return err
+		for _, votingID := range votingIDs {
+			var voting *model.Voting
+			voting, err = s.repo.FindVotingByID(votingID)
+			if err != nil {
+				return err
+			}
+			votings = append(votings, voting)
+			if voting.Status != model.VOTING_ACTIVE_STATUS {
+				return nil
+			}
+			voting.Status = model.VOTING_CANCELLED_STATUS
+			_, err = s.repo.UpdateVotingStatus(voting)
+			if err != nil {
+				return err
+			}
+			poll, err := s.pollRepo.FindByVotingID(votingID)
+			if err != nil {
+				return err
+			}
+			err = s.pollRepo.UpdateStatus(&repository.UpdateStatusParams{
+				PollID: poll.PollID,
+				Status: model.POLL_CLOSED_STATUS,
+				Tx:     tx,
+			})
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return voting, nil
+	return votings, nil
 }
 
 func (s *VotingService) FinishRatingVoting(params *FinishRatingVotingParams) error {
@@ -255,8 +253,4 @@ func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Pol
 
 func (s *VotingService) FindVotingByStatus(status string) ([]*model.Voting, error) {
 	return s.repo.FindVotingsByStatus(status)
-}
-
-func (s *VotingService) UpdateVotingStatus(voting *model.Voting) (*model.Voting, error) {
-	return s.repo.UpdateVotingStatus(voting)
 }

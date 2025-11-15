@@ -12,36 +12,76 @@ import (
 
 type ISessionService interface {
 	FinishSession(sessionID int64) error
-	CancelSession() (*model.Session, error)
+	CancelSession() (*model.Session, []*model.Voting, error)
 	AddMoviesToSession(createdBy int64, movieIDs []int64) (*model.Session, []int64, bool, error)
 	FindOngoingSession() (*model.Session, error)
 	RescheduleSession(sessionID int64, finishedAt int64) error
-	FindOrCreateSession(finishedAt int64, createdAt int64) (*model.Session, bool, error)
+	RemoveMoviesFromSession(movieIDs []int64, sessionID int64) ([]*model.Voting, error)
 }
 
 type SessionService struct {
 	repo            repository.ISessionRepo
 	movieRepo       repository.IMovieRepo
+	votingRepo      repository.IVotingRepo
 	scheduleService IScheduleService
 }
 
-func NewSessionService(repo repository.ISessionRepo, movieRepo repository.IMovieRepo, scheduleService IScheduleService) ISessionService {
-	return &SessionService{repo: repo, movieRepo: movieRepo, scheduleService: scheduleService}
+func NewSessionService(repo repository.ISessionRepo, movieRepo repository.IMovieRepo, votingRepo repository.IVotingRepo, scheduleService IScheduleService) ISessionService {
+	return &SessionService{repo: repo, movieRepo: movieRepo, votingRepo: votingRepo, scheduleService: scheduleService}
 }
 
-func (s *SessionService) FindOrCreateSession(finishedAt int64, createdAt int64) (*model.Session, bool, error) {
-	return s.repo.FindOrCreateSession(&repository.FindOrCreateSessionParams{
-		CreatedBy:  createdAt,
-		FinishedAt: &finishedAt,
+func (s *SessionService) RemoveMoviesFromSession(movieIDs []int64, sessionID int64) ([]*model.Voting, error) {
+	var votings []*model.Voting
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		err := s.repo.DisconnectMoviesFromSession(&repository.DisconnectMoviesFromSessionParams{
+			SessionID: sessionID,
+			MovieIDs:  movieIDs,
+			Tx:        tx,
+		})
+		if err != nil {
+			return err
+		}
+		votings, err = s.votingRepo.CancelVotingsBySessionID(&repository.CancelVotingsBySessionIDParams{
+			SessionID: sessionID,
+			Tx:        tx,
+		})
+		if err != nil {
+			return err
+		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return votings, nil
 }
 
 func (s *SessionService) RescheduleSession(sessionID int64, finishedAt int64) error {
 	return s.repo.RescheduleSession(sessionID, finishedAt)
 }
 
-func (s *SessionService) CancelSession() (*model.Session, error) {
-	return s.repo.CancelSession()
+func (s *SessionService) CancelSession() (*model.Session, []*model.Voting, error) {
+	var session *model.Session
+	var votings []*model.Voting
+	var err error
+	err = s.repo.Transaction(func(tx *gorm.DB) error {
+		session, err = s.repo.CancelSession(tx)
+		if err != nil {
+			return err
+		}
+		votings, err = s.votingRepo.CancelVotingsBySessionID(&repository.CancelVotingsBySessionIDParams{
+			SessionID: session.ID,
+			Tx:        tx,
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return session, votings, nil
 }
 
 func (s *SessionService) FindOngoingSession() (*model.Session, error) {

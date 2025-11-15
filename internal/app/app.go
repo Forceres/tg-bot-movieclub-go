@@ -34,6 +34,8 @@ const (
 	stateLocation              fsm.StateID = "location"
 	stateSaveSchedule          fsm.StateID = "save_schedule"
 	stateRescheduleSession     fsm.StateID = "reschedule_session"
+	statePrepareMoviesToDelete fsm.StateID = "prepare_movies_to_delete"
+	stateRemove                fsm.StateID = "remove"
 )
 
 func PollAnswerMatchFunc() bot.MatchFunc {
@@ -43,21 +45,22 @@ func PollAnswerMatchFunc() bot.MatchFunc {
 }
 
 type Handlers struct {
-	HelpHandler                 bot.HandlerFunc
-	CurrentMoviesHandler        bot.HandlerFunc
-	AlreadyWatchedMoviesHandler bot.HandlerFunc
-	VotingHandler               bot.HandlerFunc
-	PollAnswerHandler           bot.HandlerFunc
-	SuggestMovieHandler         bot.HandlerFunc
-	CancelHandler               bot.HandlerFunc
-	CancelVotingHandler         bot.HandlerFunc
-	RegisterUserHandler         bot.HandlerFunc
-	UpdateChatMemberHandler     bot.HandlerFunc
-	ScheduleHandler             bot.HandlerFunc
-	RescheduleHandler           bot.HandlerFunc
-	CancelSessionHandler        bot.HandlerFunc
-	AddsMovieHandler            bot.HandlerFunc
-	RescheduleSessionHandler    bot.HandlerFunc
+	HelpHandler                   bot.HandlerFunc
+	CurrentMoviesHandler          bot.HandlerFunc
+	AlreadyWatchedMoviesHandler   bot.HandlerFunc
+	VotingHandler                 bot.HandlerFunc
+	PollAnswerHandler             bot.HandlerFunc
+	SuggestMovieHandler           bot.HandlerFunc
+	CancelHandler                 bot.HandlerFunc
+	CancelVotingHandler           bot.HandlerFunc
+	RegisterUserHandler           bot.HandlerFunc
+	UpdateChatMemberHandler       bot.HandlerFunc
+	ScheduleHandler               bot.HandlerFunc
+	RescheduleHandler             bot.HandlerFunc
+	CancelSessionHandler          bot.HandlerFunc
+	AddsMovieHandler              bot.HandlerFunc
+	RescheduleSessionHandler      bot.HandlerFunc
+	RemoveMovieFromSessionHandler bot.HandlerFunc
 }
 
 type Middlewares struct {
@@ -109,23 +112,25 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	cancelSessionHandler := telegram.NewCancelSessionHandler(services.SessionService, services.VotingService, services.AsynqInspector)
 	addsMovieHandler := telegram.NewAddsMovieHandler(services.MovieService, services.KinopoiskService, services.SessionService, services.PollService, services.AsynqClient, services.AsynqInspector)
 	rescheduleSessionHandler := telegram.NewResheduleSessionHandler(f, services.SessionService, services.AsynqInspector, services.AsynqClient)
+	removeMovieFromSessionHandler := telegram.NewRemoveMovieFromSessionHandler(services.SessionService, services.AsynqInspector, f)
 
 	handlers := &Handlers{
-		HelpHandler:                 telegram.HelpHandler,
-		CurrentMoviesHandler:        currentMoviesHandler.Handle,
-		AlreadyWatchedMoviesHandler: alreadyWatchedMoviesHandler.Handle,
-		VotingHandler:               votingHandler.Handle,
-		PollAnswerHandler:           pollAnswerHandler.Handle,
-		SuggestMovieHandler:         suggestMovieHandler.Handle,
-		CancelHandler:               cancelHandler.Handle,
-		CancelVotingHandler:         cancelVotingHandler.Handle,
-		RegisterUserHandler:         registerUserHandler.Handle,
-		UpdateChatMemberHandler:     updateChatMemberHandler.Handle,
-		ScheduleHandler:             scheduleHandler.Handle,
-		RescheduleHandler:           scheduleHandler.HandleReschedule,
-		CancelSessionHandler:        cancelSessionHandler.Handle,
-		AddsMovieHandler:            addsMovieHandler.Handle,
-		RescheduleSessionHandler:    rescheduleSessionHandler.Handle,
+		HelpHandler:                   telegram.HelpHandler,
+		CurrentMoviesHandler:          currentMoviesHandler.Handle,
+		AlreadyWatchedMoviesHandler:   alreadyWatchedMoviesHandler.Handle,
+		VotingHandler:                 votingHandler.Handle,
+		PollAnswerHandler:             pollAnswerHandler.Handle,
+		SuggestMovieHandler:           suggestMovieHandler.Handle,
+		CancelHandler:                 cancelHandler.Handle,
+		CancelVotingHandler:           cancelVotingHandler.Handle,
+		RegisterUserHandler:           registerUserHandler.Handle,
+		UpdateChatMemberHandler:       updateChatMemberHandler.Handle,
+		ScheduleHandler:               scheduleHandler.Handle,
+		RescheduleHandler:             scheduleHandler.HandleReschedule,
+		CancelSessionHandler:          cancelSessionHandler.Handle,
+		AddsMovieHandler:              addsMovieHandler.Handle,
+		RescheduleSessionHandler:      rescheduleSessionHandler.Handle,
+		RemoveMovieFromSessionHandler: removeMovieFromSessionHandler.Handle,
 	}
 
 	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
@@ -141,6 +146,8 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		stateLocation:              scheduleHandler.PrepareLocation,
 		stateSaveSchedule:          scheduleHandler.SaveSchedule,
 		stateRescheduleSession:     rescheduleSessionHandler.RescheduleSession,
+		statePrepareMoviesToDelete: removeMovieFromSessionHandler.PrepareMoviesToDelete,
+		stateRemove:                removeMovieFromSessionHandler.Remove,
 	})
 
 	middlewares := &Middlewares{
@@ -177,10 +184,11 @@ func LoadServices(cfg *config.Config) *Services {
 	scheduleRepo := repository.NewScheduleRepository(db)
 	scheduleService := service.NewScheduleService(scheduleRepo)
 
-	sessionRepo := repository.NewSessionRepository(db)
-	sessionService := service.NewSessionService(sessionRepo, movieRepo, scheduleService)
-
 	votingRepo := repository.NewVotingRepository(db, pollRepo, movieRepo)
+
+	sessionRepo := repository.NewSessionRepository(db)
+	sessionService := service.NewSessionService(sessionRepo, movieRepo, votingRepo, scheduleService)
+
 	votingService := service.NewVotingService(votingRepo, scheduleService, sessionRepo, movieRepo, pollRepo)
 
 	voteRepo := repository.NewVoteRepository(db)
@@ -238,4 +246,5 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandler(bot.HandlerTypeMessageText, "schedule", bot.MatchTypeCommand, handlers.RescheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "adds", bot.MatchTypeCommand, handlers.AddsMovieHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "start", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "rm", bot.MatchTypeCommand, handlers.RemoveMovieFromSessionHandler, middleware.Delete)
 }

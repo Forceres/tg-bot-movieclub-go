@@ -30,16 +30,23 @@ type FinishSessionParams struct {
 	Tx        *gorm.DB
 }
 
+type DisconnectMoviesFromSessionParams struct {
+	SessionID int64
+	MovieIDs  []int64
+	Tx        *gorm.DB
+}
+
 type ISessionRepo interface {
 	GetOngoingSession(tx *gorm.DB) (*model.Session, error)
 	FindOrCreateSession(params *FindOrCreateSessionParams) (*model.Session, bool, error)
 	ConnectMoviesToSession(params *ConnectMoviesToSessionParams) error
 	FinishSession(params *FinishSessionParams) (*model.Session, error)
-	CancelSession() (*model.Session, error)
+	CancelSession(tx *gorm.DB) (*model.Session, error)
 	FindOngoingSession() (*model.Session, error)
 	RescheduleSession(sessionID int64, finishedAt int64) error
 	Transaction(fc func(tx *gorm.DB) error) error
 	Create(params *CreateSessionParams) (*model.Session, error)
+	DisconnectMoviesFromSession(params *DisconnectMoviesFromSessionParams) error
 }
 
 type SessionRepo struct {
@@ -67,9 +74,9 @@ func (r *SessionRepo) FindOngoingSession() (*model.Session, error) {
 	return &session, nil
 }
 
-func (r *SessionRepo) CancelSession() (*model.Session, error) {
+func (r *SessionRepo) CancelSession(tx *gorm.DB) (*model.Session, error) {
 	var session model.Session
-	err := r.db.Model(&session).Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Clauses(clause.Returning{}).Update("status", model.SESSION_CANCELLED_STATUS).Error
+	err := tx.Model(&session).Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Clauses(clause.Returning{}).Update("status", model.SESSION_CANCELLED_STATUS).Error
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +141,25 @@ func (r *SessionRepo) ConnectMoviesToSession(params *ConnectMoviesToSessionParam
 		return err
 	}
 	if err := tx.Model(&session).Association("Movies").Append(&movies); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *SessionRepo) DisconnectMoviesFromSession(params *DisconnectMoviesFromSessionParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	var movies []*model.Movie
+	if err := tx.Where("id IN ?", params.MovieIDs).Find(&movies).Error; err != nil {
+		return err
+	}
+	var session model.Session
+	if err := tx.First(&session, params.SessionID).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(&session).Association("Movies").Delete(&movies); err != nil {
 		return err
 	}
 	return nil

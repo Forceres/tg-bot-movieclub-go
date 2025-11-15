@@ -29,10 +29,7 @@ func NewCancelSessionHandler(service service.ISessionService, votingService serv
 }
 
 func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.Message == nil {
-		return
-	}
-	session, err := h.service.CancelSession()
+	session, votings, err := h.service.CancelSession()
 	if err != nil {
 		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
@@ -52,17 +49,8 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 	if err != nil {
 		log.Printf("Error deleting finish session task: %v", err)
 	}
-	votings, err := h.votingService.FindVotingsBySessionID(session.ID)
-	if err != nil {
-		log.Printf("Error finding votings by session ID: %v", err)
-	}
 	for _, voting := range votings {
 		if voting.Status == model.VOTING_ACTIVE_STATUS {
-			_, err := h.votingService.CancelByVotingID(voting.ID)
-			if err != nil {
-				log.Printf("Error cancelling voting: %v", err)
-				continue
-			}
 			taskInfo, err := h.inspector.GetTaskInfo(tasks.QUEUE, fmt.Sprintf("%s-%d", tasks.CloseRatingVotingTaskType, voting.ID))
 			if err != nil {
 				log.Printf("Error getting task with id: %s, %v", taskInfo.ID, err)
