@@ -163,6 +163,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 
 func LoadServices(cfg *config.Config) *Services {
 	nodeEnv := os.Getenv("NODE_ENV")
+	log.Printf("Node-env is %s", nodeEnv)
 	redisClientOpts := asynq.RedisClientOpt{Addr: cfg.Redis.URL}
 	if nodeEnv == "PRODUCTION" {
 		redisClientOpts.Password = cfg.Redis.Password
