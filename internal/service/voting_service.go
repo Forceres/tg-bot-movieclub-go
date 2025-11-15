@@ -51,6 +51,7 @@ type IVotingService interface {
 	FinishSelectionVoting(params *FinishSelectionVotingParams) (*model.Session, bool, error)
 	StartVoting(params *StartRatingVotingParams) (*model.Poll, error)
 	FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error)
+	CancelByVotingID(votingID int64) (*model.Voting, error)
 }
 
 type VotingService struct {
@@ -67,6 +68,42 @@ func NewVotingService(repo repository.IVotingRepo, scheduleService IScheduleServ
 
 func (s *VotingService) FindVotingsBySessionID(sessionID int64) ([]*model.Voting, error) {
 	return s.repo.FindVotingsBySessionID(sessionID)
+}
+
+func (s *VotingService) CancelByVotingID(votingID int64) (*model.Voting, error) {
+	var voting *model.Voting
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		var err error
+		voting, err = s.repo.FindVotingByID(votingID)
+		if err != nil {
+			return err
+		}
+		if voting.Status != model.VOTING_ACTIVE_STATUS {
+			return nil
+		}
+		voting.Status = model.VOTING_CANCELLED_STATUS
+		_, err = s.repo.UpdateVotingStatus(voting)
+		if err != nil {
+			return err
+		}
+		poll, err := s.pollRepo.FindByVotingID(votingID)
+		if err != nil {
+			return err
+		}
+		err = s.pollRepo.UpdateStatus(&repository.UpdateStatusParams{
+			PollID: poll.PollID,
+			Status: model.POLL_CLOSED_STATUS,
+			Tx:     tx,
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return voting, nil
 }
 
 func (s *VotingService) FinishRatingVoting(params *FinishRatingVotingParams) error {
@@ -115,7 +152,7 @@ func (s *VotingService) FinishSelectionVoting(params *FinishSelectionVotingParam
 		}
 		err = s.pollRepo.UpdateStatus(&repository.UpdateStatusParams{
 			PollID: params.PollID,
-			Status: "closed",
+			Status: model.POLL_CLOSED_STATUS,
 			Tx:     tx,
 		})
 		if err != nil {

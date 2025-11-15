@@ -9,9 +9,9 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
-func UpdateChatMemberMatchFunc() bot.MatchFunc {
+func UpdateChatMemberMatchFunc(groupID int64) bot.MatchFunc {
 	return func(update *models.Update) bool {
-		return update != nil && (update.MyChatMember != nil || update.ChatMember != nil)
+		return update != nil && (update.MyChatMember != nil || update.ChatMember != nil) && update.MyChatMember.Chat.ID == groupID
 	}
 }
 

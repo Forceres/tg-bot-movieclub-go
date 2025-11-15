@@ -99,12 +99,20 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		idxs := update.Message.Text
 		fsmutils.AppendMessageID(h.f, userID, update.Message.ID)
 		cancelIndexes := []int64{}
+		votings, ok := h.f.Get(userID, "votings")
+		if !ok {
+			h.f.Reset(userID)
+			return
+		}
 		iter := strings.SplitSeq(idxs, ",")
 		unique := make(map[int64]struct{})
 		for id := range iter {
 			cancelIdx, err := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
 			if err == nil {
 				if _, exists := unique[cancelIdx]; exists {
+					continue
+				}
+				if cancelIdx <= 0 || cancelIdx > int64(len(votings.([]*model.Voting))) {
 					continue
 				}
 				unique[cancelIdx] = struct{}{}
@@ -123,11 +131,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			fsmutils.AppendMessageID(h.f, userID, msg.ID)
 			return
 		}
-		votings, ok := h.f.Get(userID, "votings")
-		if !ok {
-			h.f.Reset(userID)
-			return
-		}
+
 		votingIDs := []int64{}
 		for _, idx := range cancelIndexes {
 			for votingIdx, voting := range votings.([]*model.Voting) {

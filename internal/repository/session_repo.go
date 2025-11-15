@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"log"
+
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -114,6 +116,7 @@ func (r *SessionRepo) FindOrCreateSession(params *FindOrCreateSessionParams) (*m
 	if err != nil {
 		return nil, false, err
 	}
+	log.Println(session)
 	return &session, created, nil
 }
 

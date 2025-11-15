@@ -10,6 +10,7 @@ type IPollService interface {
 	GetPollByPollID(pollID string) (*model.Poll, error)
 	GetOpenedPollByMovieID(movieID int64) (*model.Poll, error)
 	GetPollOptionsByPollID(pollID int64) ([]*model.PollOption, error)
+	GetPollByVotingID(votingID int64) (*model.Poll, error)
 }
 
 type PollService struct {
@@ -18,6 +19,10 @@ type PollService struct {
 
 func NewPollService(pollRepo repository.IPollRepo) IPollService {
 	return &PollService{pollRepo: pollRepo}
+}
+
+func (s *PollService) GetPollByVotingID(votingID int64) (*model.Poll, error) {
+	return s.pollRepo.FindByVotingID(votingID)
 }
 
 func (s *PollService) CreatePollOption(option *model.PollOption) error {

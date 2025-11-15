@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -57,6 +58,11 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 	}
 	for _, voting := range votings {
 		if voting.Status == model.VOTING_ACTIVE_STATUS {
+			_, err := h.votingService.CancelByVotingID(voting.ID)
+			if err != nil {
+				log.Printf("Error cancelling voting: %v", err)
+				continue
+			}
 			taskInfo, err := h.inspector.GetTaskInfo(tasks.QUEUE, fmt.Sprintf("%s-%d", tasks.CloseRatingVotingTaskType, voting.ID))
 			if err != nil {
 				log.Printf("Error getting task with id: %s, %v", taskInfo.ID, err)
@@ -65,6 +71,19 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 			err = h.inspector.DeleteTask(tasks.QUEUE, taskInfo.ID)
 			if err != nil {
 				log.Printf("Error deleting close voting task: %v", err)
+			}
+			var payload tasks.CloseRatingVotingPayload
+			err = json.Unmarshal([]byte(taskInfo.Payload), &payload)
+			if err != nil {
+				log.Printf("Error unmarshaling task payload: %v", err)
+				continue
+			}
+			_, err = b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+				ChatID:    payload.ChatID,
+				MessageID: payload.MessageID,
+			})
+			if err != nil {
+				log.Printf("Error deleting message: %v", err)
 			}
 		}
 	}

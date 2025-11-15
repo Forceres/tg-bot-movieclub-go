@@ -362,7 +362,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				f.Reset(userID)
 				return
 			}
-			duration := time.Duration(duration.(int)) * time.Second
+			duration := time.Duration(duration.(int)) * time.Hour
 			err = tasks.EnqueueCloseRatingVotingTask(h.scheduler, duration, &tasks.CloseRatingVotingPayload{
 				PollID:    poll.PollID,
 				MessageID: poll.MessageID,

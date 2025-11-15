@@ -102,9 +102,10 @@ func (h *ResheduleSessionHandler) RescheduleSession(f *fsm.FSM, args ...any) {
 	} else {
 		log.Printf("Deleted scheduled finish session task: %s", taskId)
 	}
+	duration := time.Until(time.Unix(finishedAt, 0))
 	err = tasks.EnqueueFinishSessionTask(h.client, &tasks.EnqueueFinishSessionParams{
 		SessionID: session.ID,
-		Duration:  time.Duration(finishedAt) - time.Duration(time.Now().Unix()),
+		Duration:  duration,
 	})
 	if err != nil {
 		log.Printf("Error scheduling new finish session task: %v", err)
@@ -134,13 +135,14 @@ func (h *ResheduleSessionHandler) RescheduleSession(f *fsm.FSM, args ...any) {
 			log.Printf("Error unmarshaling task payload: %v", err)
 			continue
 		}
+		duration := time.Until(time.Unix(finishedAt, 0))
 		err := tasks.EnqueueOpenRatingVotingTask(h.client, &tasks.EnqueueOpenRatingVotingParams{
 			ChatID:    p.ChatID,
 			SessionID: session.ID,
 			Movie:     p.Movie,
 			UserID:    p.UserID,
 			TaskID:    t.ID,
-			Duration:  time.Duration(finishedAt) - time.Duration(time.Now().Unix()),
+			Duration:  duration,
 		})
 		if err != nil {
 			log.Printf("Error scheduling new open rating voting task: %v", err)

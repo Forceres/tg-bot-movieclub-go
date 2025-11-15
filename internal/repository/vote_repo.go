@@ -41,7 +41,7 @@ func (r *VoteRepo) DeleteByUserIdAndVotingId(params *DeleteByUserIdAndVotingIdPa
 	if params.Tx != nil {
 		tx = params.Tx
 	}
-	return tx.Model(&model.Vote{UserID: params.UserID, VotingID: params.VotingID}).Delete(&model.Vote{}).Error
+	return tx.Where(&model.Vote{UserID: params.UserID, VotingID: params.VotingID}).Delete(&model.Vote{}).Error
 }
 
 func (r *VoteRepo) Create(params *CreateVoteParams) error {

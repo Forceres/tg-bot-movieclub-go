@@ -116,7 +116,7 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 		log.Printf("Error sending final decision message: %v", err)
 		return err
 	}
-	duration := time.Duration(session.FinishedAt) - time.Duration(time.Now().Unix())
+	duration := time.Until(time.Unix(session.FinishedAt, 0))
 	if created {
 		err = EnqueueFinishSessionTask(t.client, &EnqueueFinishSessionParams{
 			SessionID: session.ID,

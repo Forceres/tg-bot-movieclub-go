@@ -94,7 +94,7 @@ func (t *OpenRatingVotingTaskProcessor) Process(ctx context.Context, task *asynq
 	if err := json.Unmarshal(task.Payload(), &p); err != nil {
 		return err
 	}
-	duration := time.Duration(15) * time.Minute
+	duration := time.Duration(2) * time.Hour
 	finishedAt := time.Now().Add(duration).Unix()
 	title := fmt.Sprintf("Оцените фильм: %s", p.Movie.Title)
 	poll, err := t.votingService.StartVoting(&service.StartRatingVotingParams{

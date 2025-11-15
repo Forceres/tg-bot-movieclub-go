@@ -23,6 +23,7 @@ type IPollRepo interface {
 	FindOpenedByMovieID(movieID int64) (*model.Poll, error)
 	FindPollOptionsByPollID(pollID int64) ([]*model.PollOption, error)
 	UpdateStatus(params *UpdateStatusParams) error
+	FindByVotingID(votingID int64) (*model.Poll, error)
 }
 
 type PollRepo struct {
@@ -44,6 +45,12 @@ func (r *PollRepo) Create(params *CreatePollParams) (*model.Poll, error) {
 
 func (r *PollRepo) CreatePollOption(option *model.PollOption) error {
 	return r.db.Create(option).Error
+}
+
+func (r *PollRepo) FindByVotingID(votingID int64) (*model.Poll, error) {
+	var poll model.Poll
+	err := r.db.Model(&model.Poll{}).Where("voting_id = ? AND status = ?", votingID, model.POLL_OPENED_STATUS).First(&poll).Error
+	return &poll, err
 }
 
 func (r *PollRepo) FindByPollID(pollID string) (*model.Poll, error) {

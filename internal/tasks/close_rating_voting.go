@@ -64,7 +64,6 @@ func EnqueueCloseRatingVotingTask(client *asynq.Client, duration time.Duration, 
 		log.Printf("Error creating close rating voting task: %v", err)
 		return err
 	}
-	// seconds
 	scheduleOpts := []asynq.Option{asynq.MaxRetry(1), asynq.ProcessIn(duration), asynq.TaskID(fmt.Sprintf("%s-%d", CloseRatingVotingTaskType, params.VotingID)), asynq.Queue(QUEUE)}
 	taskInfo, err := client.Enqueue(task, scheduleOpts...)
 	if err != nil {

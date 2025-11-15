@@ -101,7 +101,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	votingHandler := telegram.NewVotingHandler(services.MovieService, services.VotingService, services.PollService, services.VoteService, f, services.AsynqClient)
 	suggestMovieHandler := telegram.NewSuggestMovieHandler(services.MovieService, services.KinopoiskService)
 	cancelHandler := telegram.NewCancelHandler(f)
-	cancelVotingHandler := telegram.NewCancelVotingHandler(f, services.VotingService)
+	cancelVotingHandler := telegram.NewCancelVotingHandler(f, services.VotingService, services.AsynqInspector)
 	registerUserHandler := telegram.NewRegisterUserHandler(services.UserService)
 	updateChatMemberHandler := telegram.NewUpdateChatMemberHandler(services.UserService)
 	pollAnswerHandler := telegram.NewPollAnswerHandler(services.PollService, services.VoteService)
@@ -223,7 +223,7 @@ func RegisterTaskProcessors(services *Services, b *bot.Bot, mux *asynq.ServeMux)
 
 func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *config.Config) {
 	b.RegisterHandlerMatchFunc(PollAnswerMatchFunc(), handlers.PollAnswerHandler)
-	b.RegisterHandlerMatchFunc(telegram.UpdateChatMemberMatchFunc(), handlers.UpdateChatMemberHandler)
+	b.RegisterHandlerMatchFunc(telegram.UpdateChatMemberMatchFunc(cfg.Telegram.GroupID), handlers.UpdateChatMemberHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#перенос", bot.MatchTypeExact, handlers.RescheduleSessionHandler, middleware.Delete)
