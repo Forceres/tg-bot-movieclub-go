@@ -1,21 +1,6 @@
 version: "3.8"
 
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: movieclub-redis
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    networks:
-      - movieclub-network
-
   bot:
     build:
       context: .
@@ -37,6 +22,7 @@ services:
       - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_URL=${REDIS_URL}
+      - REDIS_USERNAME=${REDIS_USERNAME}
       - NODE_ENV=PRODUCTION
       - DOMAIN_ADDRESS=${DOMAIN_ADDRESS}
     volumes:
@@ -66,6 +52,7 @@ services:
       - DATABASE_NAME=/root/data/db.sqlite3
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_URL=${REDIS_URL}
+      - REDIS_USERNAME=${REDIS_USERNAME}
       - KINOPOISK_API_VERSION=${KINOPOISK_API_VERSION:-v2.2}
       - KINOPOISK_API_KEY=${KINOPOISK_API_KEY}
       - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
@@ -80,8 +67,6 @@ services:
         max-file: "3"
 
 volumes:
-  redis_data:
-    driver: local
   bot_data:
     driver: local
 

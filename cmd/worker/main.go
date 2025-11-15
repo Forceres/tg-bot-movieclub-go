@@ -17,10 +17,10 @@ func main() {
 	}
 
 	nodeEnv := os.Getenv("NODE_ENV")
-	log.Printf("Node-env is %s", nodeEnv)
 	redisClientOpts := asynq.RedisClientOpt{Addr: cfg.Redis.URL}
 	if nodeEnv == "PRODUCTION" {
 		redisClientOpts.Password = cfg.Redis.Password
+		redisClientOpts.Username = cfg.Redis.Username
 	}
 
 	services := app.LoadServices(cfg)
