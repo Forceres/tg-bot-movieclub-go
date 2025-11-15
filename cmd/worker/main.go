@@ -23,6 +23,8 @@ func main() {
 		redisClientOpts.Username = cfg.Redis.Username
 	}
 
+	log.Printf("%v", redisClientOpts)
+
 	services := app.LoadServices(cfg)
 
 	srv := asynq.NewServer(
