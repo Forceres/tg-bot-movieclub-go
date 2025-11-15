@@ -32,7 +32,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if len(ids) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Не найдено ссылок на фильмы Кинопоиска в сообщении.",
+			Text:   "🔍 Не найдено ссылок на фильмы Кинопоиска в сообщении.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -53,7 +53,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if len(idsToFind) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Все фильмы из вашего сообщения уже предложены ранее.",
+			Text:   "ℹ️ Все фильмы из вашего сообщения уже предложены ранее.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -63,7 +63,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if len(ids) > 5 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Слишком много фильмов в одном сообщении. Пожалуйста, отправляйте не более 5 фильмов за раз.",
+			Text:   "⚠️ Слишком много фильмов в одном сообщении. Пожалуйста, отправляйте не более 5 фильмов за раз.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -74,7 +74,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при поиске фильмов на Кинопоиске.",
+			Text:   "❌ Ошибка при поиске фильмов на Кинопоиске.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -84,7 +84,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if len(moviesDto) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Не удалось найти фильмы по предоставленным ссылкам.",
+			Text:   "🔍 Не удалось найти фильмы по предоставленным ссылкам.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -100,7 +100,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Фильмы успешно добавлены в предложку!",
+		Text:   "✅ Фильмы успешно добавлены в предложку!",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

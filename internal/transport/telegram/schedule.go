@@ -47,7 +47,7 @@ func (h *ScheduleHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 	if err != nil || schedule == nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Нет активного расписания.",
+			Text:   "ℹ️ Нет активного расписания.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -73,7 +73,7 @@ func (h *ScheduleHandler) Handle(ctx context.Context, b *bot.Bot, update *models
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Активное расписание: " + out,
+		Text:   "📅 Активное расписание: " + out,
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -145,7 +145,7 @@ func (h *ScheduleHandler) PrepareTime(f *fsm.FSM, args ...any) {
 	callbackQuery := args[3].(*models.CallbackQuery)
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: callbackQuery.Message.Message.Chat.ID,
-		Text:   "Введите время в формате ЧЧ:ММ (например, 18:30)",
+		Text:   "🕐 Введите время в формате ЧЧ:ММ (например, 18:30)",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -166,7 +166,7 @@ func (h *ScheduleHandler) PrepareLocation(f *fsm.FSM, args ...any) {
 	update := args[3].(*models.Update)
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Введите локацию (например, Europe/Moscow)",
+		Text:   "🌍 Введите локацию (например, Europe/Moscow)",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -200,7 +200,7 @@ func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при сохранении расписания.",
+			Text:   "❌ Ошибка при сохранении расписания.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -210,7 +210,7 @@ func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Расписание успешно обновлено.",
+		Text:   "✅ Расписание успешно обновлено.",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

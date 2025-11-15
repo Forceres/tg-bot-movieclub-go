@@ -50,7 +50,7 @@ func (h *CancelVotingHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if err != nil || len(votings) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Нет активных голосований.",
+			Text:   "ℹ️ Нет активных голосований.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -71,7 +71,7 @@ func (h *CancelVotingHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при отображении голосований.",
+			Text:   "❌ Ошибка при отображении голосований.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -96,7 +96,7 @@ func (h *CancelVotingHandler) PrepareCancelIDs(f *fsm.FSM, args ...any) {
 	f.Set(userID, "paginatorMsgID", paginatorMsgID)
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Перечислите номера голосований, которые хотите отменить, через запятую.",
+		Text:   "📝 Перечислите номера голосований, которые хотите отменить, через запятую.",
 	})
 	if err != nil {
 		return
@@ -123,7 +123,7 @@ func (h *CancelVotingHandler) Cancel(f *fsm.FSM, args ...any) {
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при отмене голосований.",
+			Text:   "❌ Ошибка при отмене голосований.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -164,7 +164,7 @@ func (h *CancelVotingHandler) Cancel(f *fsm.FSM, args ...any) {
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Выбранные голосования были отменены.",
+		Text:   "✅ Выбранные голосования были отменены.",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

@@ -45,7 +45,7 @@ func (h *AlreadyWatchedMoviesHandler) Handle(ctx context.Context, b *bot.Bot, up
 		log.Printf("Error retrieving watched movies: %v", err)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: chatID,
-			Text:   "Ошибка при получении списка фильмов",
+			Text:   "❌ Ошибка при получении списка фильмов",
 		})
 		if err != nil {
 			log.Printf("Error sending error message: %v", err)
@@ -55,7 +55,7 @@ func (h *AlreadyWatchedMoviesHandler) Handle(ctx context.Context, b *bot.Bot, up
 	if len(formattedMovies) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: chatID,
-			Text:   "Список просмотренных фильмов пуст.",
+			Text:   "📋 Список просмотренных фильмов пуст.",
 		})
 		if err != nil {
 			log.Printf("Error sending empty list message: %v", err)

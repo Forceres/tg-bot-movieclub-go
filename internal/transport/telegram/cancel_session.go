@@ -33,7 +33,7 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 	if err != nil {
 		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при отмене сессии.",
+			Text:   "❌ Ошибка при отмене сессии.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -77,7 +77,7 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Сессия успешно отменена.",
+		Text:   "✅ Сессия успешно отменена.",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

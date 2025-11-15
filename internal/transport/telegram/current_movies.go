@@ -26,7 +26,7 @@ func (h *CurrentMoviesHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Мы пока ничего не смотрим!",
+			Text:   "🎬 Мы пока ничего не смотрим!",
 		})
 		if err != nil {
 			log.Printf("Error sending the message: %v", err)

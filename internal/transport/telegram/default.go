@@ -50,10 +50,13 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 	case stateDescription:
 		_, exists := h.f.Get(userID, "session_id")
 		if !exists {
-			b.SendMessage(ctx, &bot.SendMessageParams{
+			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,
 				Text:   "❌ Ошибка: сессия не найдена. Попробуйте снова с /custom.",
 			})
+			if err != nil {
+				log.Printf("Error sending session not found message: %v", err)
+			}
 			h.f.Reset(userID)
 			return
 		}
@@ -86,7 +89,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		if errDuration != nil || duration <= 0 {
 			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
-				Text:   "Введите корректное целое число > 0",
+				Text:   "⚠️ Введите корректное целое число > 0",
 			})
 			if err != nil {
 				log.Printf("Error sending message: %v", err)
@@ -116,7 +119,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		if len(movieIndexes) == 0 {
 			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
-				Text:   "Введите корректные целые числа через запятую",
+				Text:   "⚠️ Введите корректные целые числа через запятую",
 			})
 			if err != nil {
 				log.Printf("Error sending message: %v", err)
@@ -154,7 +157,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		if len(cancelIndexes) == 0 {
 			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
-				Text:   "Введите корректные целые числа через запятую",
+				Text:   "⚠️ Введите корректные целые числа через запятую",
 			})
 			if err != nil {
 				log.Printf("Error sending message: %v", err)
@@ -214,7 +217,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		if len(indexes) == 0 {
 			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
-				Text:   "Введите корректные целые числа через запятую",
+				Text:   "⚠️ Введите корректные целые числа через запятую",
 			})
 			if err != nil {
 				log.Printf("Error sending message: %v", err)
@@ -272,7 +275,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		if hour == nil || minute == nil {
 			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
-				Text:   "Введите корректное время в формате ЧЧ:ММ",
+				Text:   "⚠️ Введите корректное время в формате ЧЧ:ММ",
 			})
 			if err != nil {
 				log.Printf("Error sending message: %v", err)
@@ -291,7 +294,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 		if err != nil {
 			msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: chatID,
-				Text:   "Введите корректную локацию (например, Europe/Moscow)",
+				Text:   "⚠️ Введите корректную локацию (например, Europe/Moscow)",
 			})
 			if err != nil {
 				log.Printf("Error sending message: %v", err)

@@ -42,7 +42,7 @@ func (h *ResheduleSessionHandler) Handle(ctx context.Context, b *bot.Bot, update
 	}
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Обновление даты сессии просмотра...",
+		Text:   "📅 Обновление даты сессии просмотра...",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -66,7 +66,7 @@ func (h *ResheduleSessionHandler) RescheduleSession(f *fsm.FSM, args ...any) {
 		log.Printf("Error finding ongoing session: %v", err)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Нет текущей сессии просмотра.",
+			Text:   "ℹ️ Нет текущей сессии просмотра.",
 		})
 		if err != nil {
 			log.Printf("Error sending error message: %v", err)
@@ -84,7 +84,7 @@ func (h *ResheduleSessionHandler) RescheduleSession(f *fsm.FSM, args ...any) {
 		log.Printf("Error rescheduling session: %v", err)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при обновлении сессии просмотра.",
+			Text:   "❌ Ошибка при обновлении сессии просмотра.",
 		})
 		if err != nil {
 			log.Printf("Error sending error message: %v", err)
@@ -152,7 +152,7 @@ func (h *ResheduleSessionHandler) RescheduleSession(f *fsm.FSM, args ...any) {
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Сессия просмотра успешно обновлена.",
+		Text:   "✅ Сессия просмотра успешно обновлена.",
 	})
 	if err != nil {
 		log.Printf("Error sending confirmation message: %v", err)

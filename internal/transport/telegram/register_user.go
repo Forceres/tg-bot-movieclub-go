@@ -40,7 +40,7 @@ func (h *RegisterUserHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Произошла ошибка при регистрации пользователя.",
+			Text:   "❌ Произошла ошибка при регистрации пользователя.",
 		})
 		if err != nil {
 			log.Printf("Error sending error message: %v", err)
@@ -49,7 +49,7 @@ func (h *RegisterUserHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Пользователь успешно зарегистрирован.",
+		Text:   "✅ Пользователь успешно зарегистрирован.",
 	})
 	if err != nil {
 		return

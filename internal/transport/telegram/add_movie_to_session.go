@@ -58,7 +58,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 	if rawPayload == "" {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Пожалуйста, отправьте ссылки или идентификаторы фильмов после команды /adds.",
+			Text:   "📝 Пожалуйста, отправьте ссылки или идентификаторы фильмов после команды /adds.",
 		})
 		if err != nil {
 			log.Printf("failed to send error message: %v", err)
@@ -68,9 +68,9 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 
 	movieIDs, invalidTokens := parseMovieIDs(rawPayload)
 	if len(movieIDs) == 0 {
-		text := "Не удалось найти ID фильмов. Убедитесь, что вы отправили корректные ссылки на Кинопоиск или числовые идентификаторы."
+		text := "❌ Не удалось найти ID фильмов. Убедитесь, что вы отправили корректные ссылки на Кинопоиск или числовые идентификаторы."
 		if len(invalidTokens) > 0 {
-			text = fmt.Sprintf("%s Невалидные значения: %s", text, strings.Join(invalidTokens, ", "))
+			text = fmt.Sprintf("%s\n⚠️ Невалидные значения: %s", text, strings.Join(invalidTokens, ", "))
 		}
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
@@ -94,7 +94,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 			log.Printf("failed to get movie %d: %v", id, err)
 			_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,
-				Text:   "Ошибка при проверке фильмов в базе данных.",
+				Text:   "❌ Ошибка при проверке фильмов в базе данных.",
 			})
 			if err != nil {
 				log.Printf("failed to send error message: %v", err)
@@ -111,7 +111,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 			log.Printf("kinopoisk search failed: %v", err)
 			_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,
-				Text:   "Ошибка при запросе фильмов в Кинопоиске.",
+				Text:   "❌ Ошибка при запросе фильмов в Кинопоиске.",
 			})
 			if err != nil {
 				log.Printf("failed to send error message: %v", err)
@@ -121,7 +121,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 		if len(moviesDTO) == 0 {
 			_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,
-				Text:   "Не удалось найти фильмы по указанным ссылкам.",
+				Text:   "🔍 Не удалось найти фильмы по указанным ссылкам.",
 			})
 			if err != nil {
 				log.Printf("failed to send error message: %v", err)
@@ -138,7 +138,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 		if len(createdIDs) == 0 {
 			_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,
-				Text:   "Не удалось сохранить новые фильмы. Попробуйте снова позже.",
+				Text:   "❌ Не удалось сохранить новые фильмы. Попробуйте снова позже.",
 			})
 			if err != nil {
 				log.Printf("failed to send error message: %v", err)
@@ -151,7 +151,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 	if len(targetIDs) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Фильмы уже находятся в сессии или не удалось их обработать.",
+			Text:   "ℹ️ Фильмы уже находятся в сессии или не удалось их обработать.",
 		})
 		if err != nil {
 			log.Printf("failed to send error message: %v", err)
@@ -164,7 +164,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 		log.Printf("failed to add movies to session: %v", err)
 		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Не удалось добавить фильмы в сессию.",
+			Text:   "❌ Не удалось добавить фильмы в сессию.",
 		})
 		if err != nil {
 			log.Printf("failed to send error message: %v", err)

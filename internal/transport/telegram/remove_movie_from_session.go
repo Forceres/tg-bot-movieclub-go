@@ -52,7 +52,7 @@ func (h *RemoveMovieFromSessionHandler) Handle(ctx context.Context, b *bot.Bot, 
 	if err != nil || len(session.Movies) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Нет фильмов в текущей сессии.",
+			Text:   "ℹ️ Нет фильмов в текущей сессии.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -73,7 +73,7 @@ func (h *RemoveMovieFromSessionHandler) Handle(ctx context.Context, b *bot.Bot, 
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при отображении фильмов.",
+			Text:   "❌ Ошибка при отображении фильмов.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -98,7 +98,7 @@ func (h *RemoveMovieFromSessionHandler) PrepareMoviesToDelete(f *fsm.FSM, args .
 	f.Set(userID, "paginatorMsgID", paginatorMsgID)
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Перечислите номера фильмов, которые хотите удалить из сессии, через запятую.",
+		Text:   "📝 Перечислите номера фильмов, которые хотите удалить из сессии, через запятую.",
 	})
 	if err != nil {
 		return
@@ -125,7 +125,7 @@ func (h *RemoveMovieFromSessionHandler) Remove(f *fsm.FSM, args ...any) {
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Нет активной сессии.",
+			Text:   "ℹ️ Нет активной сессии.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -138,7 +138,7 @@ func (h *RemoveMovieFromSessionHandler) Remove(f *fsm.FSM, args ...any) {
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при удалении фильмов из сессии.",
+			Text:   "❌ Ошибка при удалении фильмов из сессии.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -179,7 +179,7 @@ func (h *RemoveMovieFromSessionHandler) Remove(f *fsm.FSM, args ...any) {
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Выбранные фильмы были успешно удалены из сессии.",
+		Text:   "✅ Выбранные фильмы были успешно удалены из сессии.",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

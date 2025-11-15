@@ -106,7 +106,7 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 	case SELECTION_TYPE:
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-			Text:   "Вы выбрали 'Выбор фильма'. Начинаем процесс выбора фильма.",
+			Text:   "🎬 Вы выбрали 'Выбор фильма'. Начинаем процесс выбора фильма.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -116,7 +116,7 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 	case RATING_TYPE:
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-			Text:   "Вы выбрали 'Оценка фильма'. Начинаем процесс оценки фильма.",
+			Text:   "⭐ Вы выбрали 'Оценка фильма'. Начинаем процесс оценки фильма.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -126,7 +126,7 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 	default:
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-			Text:   "Неизвестный выбор.",
+			Text:   "❓ Неизвестный выбор.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -146,7 +146,7 @@ func (h *VotingHandler) PrepareVotingTitle(f *fsm.FSM, args ...any) {
 	update := args[3].(*models.Update)
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-		Text:   "Введите название для голосования!",
+		Text:   "📝 Введите название для голосования!",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -164,7 +164,7 @@ func (h *VotingHandler) PrepareVotingDuration(f *fsm.FSM, args ...any) {
 	update := args[3].(*models.Update)
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Введите длительность голосования (в часах)",
+		Text:   "⏱️ Введите длительность голосования (в часах)",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -180,7 +180,7 @@ func (h *VotingHandler) onCancelSelect(ctx context.Context, b *bot.Bot, update *
 	h.fsm.Reset(userID)
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.CallbackQuery.Message.Message.Chat.ID,
-		Text:   "Отменено.",
+		Text:   "🚫 Отменено.",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -209,7 +209,7 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	if err != nil || len(movies) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Увы фильмов нет.",
+			Text:   "📭 Увы фильмов нет.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -232,7 +232,7 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 		log.Printf("Error showing paginator: %v", err)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Ошибка при показе пагинатора.",
+			Text:   "❌ Ошибка при показе пагинатора.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -242,7 +242,7 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Перечисли номера фильмов, которые должны быть оценены через запятую",
+		Text:   "📝 Перечисли номера фильмов, которые должны быть оценены через запятую",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
