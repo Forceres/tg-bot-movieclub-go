@@ -111,7 +111,7 @@ func (h *CancelVotingHandler) Cancel(f *fsm.FSM, args ...any) {
 		return
 	}
 	for _, id := range ids.([]int64) {
-		voting, err := h.votingService.UpdateVotingStatus(&model.Voting{ID: id, Status: "cancelled"})
+		voting, err := h.votingService.UpdateVotingStatus(&model.Voting{ID: id, Status: model.VOTING_CANCELLED_STATUS})
 		if err != nil {
 			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: update.Message.Chat.ID,

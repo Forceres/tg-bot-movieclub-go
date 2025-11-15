@@ -11,7 +11,7 @@ type UserService struct {
 }
 
 type IUserService interface {
-	CreateIfNotExist(user *model.User, role string) error
+	Create(user *model.User, role string) error
 	FindByID(userID int64) (*model.User, error)
 }
 
@@ -19,13 +19,13 @@ func NewUserService(repo repository.IUserRepo, roleRepo repository.IRoleRepo) *U
 	return &UserService{repo: repo, roleRepo: roleRepo}
 }
 
-func (s *UserService) CreateIfNotExist(user *model.User, role string) error {
+func (s *UserService) Create(user *model.User, role string) error {
 	roleModel, err := s.roleRepo.FindByName(role)
 	if err != nil {
 		return err
 	}
 	user.RoleID = roleModel.ID
-	return s.repo.CreateIfNotExist(user)
+	return s.repo.Save(user)
 }
 
 func (s *UserService) FindByID(userID int64) (*model.User, error) {

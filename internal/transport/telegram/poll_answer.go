@@ -64,7 +64,7 @@ func (h *PollAnswerHandler) Handle(ctx context.Context, b *bot.Bot, update *mode
 			}
 		}
 
-		if err := h.voteService.Upsert(vote); err != nil {
+		if err := h.voteService.Create(vote); err != nil {
 			log.Printf("Error saving vote: %v", err)
 		}
 	}

@@ -31,7 +31,7 @@ func (h *RegisterUserHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	if update.ChatMember != nil && (update.ChatMember.NewChatMember.Administrator != nil || update.ChatMember.OldChatMember.Administrator != nil || update.ChatMember.NewChatMember.Owner != nil || update.ChatMember.OldChatMember.Owner != nil) {
 		role = "ADMIN"
 	}
-	err := h.userService.CreateIfNotExist(&model.User{
+	err := h.userService.Create(&model.User{
 		ID:        user.ID,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,

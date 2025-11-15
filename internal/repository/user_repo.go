@@ -10,16 +10,16 @@ type UserRepo struct {
 }
 
 type IUserRepo interface {
-	CreateIfNotExist(user *model.User) error
 	FindByID(userID int64) (*model.User, error)
+	Save(user *model.User) error
 }
 
 func NewUserRepository(db *gorm.DB) IUserRepo {
 	return &UserRepo{db: db}
 }
 
-func (r *UserRepo) CreateIfNotExist(user *model.User) error {
-	return r.db.Where(&model.User{ID: user.ID}).Attrs(user).FirstOrCreate(&user).Error
+func (r *UserRepo) Save(user *model.User) error {
+	return r.db.Save(user).Error
 }
 
 func (r *UserRepo) FindByID(userID int64) (*model.User, error) {

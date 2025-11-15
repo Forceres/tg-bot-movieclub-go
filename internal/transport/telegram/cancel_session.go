@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
 	"github.com/go-telegram/bot"
@@ -55,7 +56,7 @@ func (h *CancelSessionHandler) Handle(ctx context.Context, b *bot.Bot, update *m
 		log.Printf("Error finding votings by session ID: %v", err)
 	}
 	for _, voting := range votings {
-		if voting.Status == "ongoing" {
+		if voting.Status == model.VOTING_ACTIVE_STATUS {
 			taskInfo, err := h.inspector.GetTaskInfo(tasks.QUEUE, fmt.Sprintf("%s-%d", tasks.CloseRatingVotingTaskType, voting.ID))
 			if err != nil {
 				log.Printf("Error getting task with id: %s, %v", taskInfo.ID, err)

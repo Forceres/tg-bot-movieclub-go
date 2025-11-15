@@ -92,7 +92,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 		return
 	}
 	for _, movieDto := range moviesDto {
-		err := h.movieService.Create(&movieDto, update.Message.From.ID)
+		err := h.movieService.Upsert(&movieDto, update.Message.From.ID)
 		if err != nil {
 			log.Printf("Error while creating movie: %v", err)
 			continue

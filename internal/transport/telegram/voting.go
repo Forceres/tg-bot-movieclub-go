@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
@@ -279,7 +280,12 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				continue
 			}
 			movieIDs = append(movieIDs, movieID)
-			pollOpts = append(pollOpts, models.InputPollOption{Text: (*movieData)[1]})
+			var title string = (*movieData)[1]
+			parts := strings.SplitN((*movieData)[1], ". ", 2)
+			if len(parts) == 2 {
+				title = parts[1]
+			}
+			pollOpts = append(pollOpts, models.InputPollOption{Text: title})
 		}
 		poll, err := h.votingService.StartVoting(&service.StartRatingVotingParams{
 			Bot:     b,
@@ -331,7 +337,12 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				continue
 			}
 			movieID, _ := strconv.ParseInt((*movieData)[0], 10, 64)
-			title := fmt.Sprintf("Оцените фильм: %s", (*movieData)[1])
+			var title string = (*movieData)[1]
+			parts := strings.SplitN((*movieData)[1], ". ", 2)
+			if len(parts) == 2 {
+				title = parts[1]
+			}
+			title = fmt.Sprintf("Оцените фильм: %s", title)
 			poll, err := h.votingService.StartVoting(&service.StartRatingVotingParams{
 				Bot:     b,
 				Context: ctx,

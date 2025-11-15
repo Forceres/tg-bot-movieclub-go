@@ -3,35 +3,53 @@ package repository
 import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
+type DeleteByUserIdAndVotingIdParams struct {
+	UserID   int64
+	VotingID int64
+	Tx       *gorm.DB
+}
+
+type CreateVoteParams struct {
+	Vote *model.Vote
+	Tx   *gorm.DB
+}
+
 type IVoteRepo interface {
-	Create(vote *model.Vote) error
-	Upsert(vote *model.Vote) error
+	Create(params *CreateVoteParams) error
+	DeleteByUserIdAndVotingId(params *DeleteByUserIdAndVotingIdParams) error
 	CalculateRatingMean(votingID int64) (float64, error)
 	CalculateMaxMovieCount(votingID int64) (int64, int64, error)
+	Transaction(func(tx *gorm.DB) error) error
 }
 
 type VoteRepo struct {
 	db *gorm.DB
 }
 
-func NewVoteRepository(db *gorm.DB) *VoteRepo {
+func NewVoteRepository(db *gorm.DB) IVoteRepo {
 	return &VoteRepo{db: db}
 }
 
-func (r *VoteRepo) Upsert(vote *model.Vote) error {
-	return r.db.Clauses(
-		clause.OnConflict{
-			UpdateAll: true,
-			Columns:   []clause.Column{{Name: "user_id"}, {Name: "voting_id"}},
-		},
-	).Create(&vote).Error
+func (r *VoteRepo) Transaction(fn func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fn)
 }
 
-func (r *VoteRepo) Create(vote *model.Vote) error {
-	if err := r.db.Create(&vote).Error; err != nil {
+func (r *VoteRepo) DeleteByUserIdAndVotingId(params *DeleteByUserIdAndVotingIdParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	return tx.Model(&model.Vote{UserID: params.UserID, VotingID: params.VotingID}).Delete(&model.Vote{}).Error
+}
+
+func (r *VoteRepo) Create(params *CreateVoteParams) error {
+	var tx *gorm.DB = r.db
+	if params.Tx != nil {
+		tx = params.Tx
+	}
+	if err := tx.Create(params.Vote).Error; err != nil {
 		return err
 	}
 	return nil
