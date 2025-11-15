@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/db"
@@ -235,16 +236,35 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#перенос", bot.MatchTypeExact, handlers.RescheduleSessionHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "help", bot.MatchTypeCommand, handlers.HelpHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "now", bot.MatchTypeCommand, handlers.CurrentMoviesHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "already", bot.MatchTypeCommand, handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "voting", bot.MatchTypeCommand, handlers.VotingHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel", bot.MatchTypeCommand, handlers.CancelHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_voting", bot.MatchTypeCommand, handlers.CancelVotingHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "cancel_session", bot.MatchTypeCommand, handlers.CancelSessionHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "register", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "schedule", bot.MatchTypeCommand, handlers.RescheduleHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "adds", bot.MatchTypeCommand, handlers.AddsMovieHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "start", bot.MatchTypeCommand, handlers.RegisterUserHandler, middleware.Delete)
-	b.RegisterHandler(bot.HandlerTypeMessageText, "rm", bot.MatchTypeCommand, handlers.RemoveMovieFromSessionHandler, middleware.Delete)
+	registerCommandHandler(b, "help", handlers.HelpHandler, middleware.Delete)
+	registerCommandHandler(b, "now", handlers.CurrentMoviesHandler, middleware.Delete)
+	registerCommandHandler(b, "already", handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
+	registerCommandHandler(b, "voting", handlers.VotingHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
+	registerCommandHandler(b, "cancel", handlers.CancelHandler, middleware.Delete)
+	registerCommandHandler(b, "cancel_voting", handlers.CancelVotingHandler, middleware.Delete)
+	registerCommandHandler(b, "cancel_session", handlers.CancelSessionHandler, middleware.Delete)
+	registerCommandHandler(b, "register", handlers.RegisterUserHandler, middleware.Delete)
+	registerCommandHandler(b, "schedule", handlers.RescheduleHandler, middleware.Delete)
+	registerCommandHandler(b, "adds", handlers.AddsMovieHandler, middleware.Delete)
+	registerCommandHandler(b, "start", handlers.RegisterUserHandler, middleware.Delete)
+	registerCommandHandler(b, "rm", handlers.RemoveMovieFromSessionHandler, middleware.Delete)
+}
+
+func registerCommandHandler(bot *bot.Bot, command string, handler bot.HandlerFunc, middlewares ...bot.Middleware) {
+	commandText := "/" + command
+	commandTextPrefix := commandText + "@"
+	matchFunc := func(update *models.Update) bool {
+		if update.Message != nil {
+			for _, e := range update.Message.Entities {
+				if e.Offset == 0 {
+					part := update.Message.Text[e.Offset : e.Offset+e.Length]
+					if part == commandText || strings.HasPrefix(part, commandTextPrefix) {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+	bot.RegisterHandlerMatchFunc(matchFunc, handler, middlewares...)
 }
