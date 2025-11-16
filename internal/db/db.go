@@ -1,13 +1,14 @@
 package db
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/config"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -24,7 +25,9 @@ func NewSqliteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		},
 	)
 
-	db, err := gorm.Open(sqlite.Open(cfg.Name), &gorm.Config{
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC", cfg.Host, cfg.User, cfg.Pass, cfg.Name, cfg.Port)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		SkipDefaultTransaction: true,
 		TranslateError:         true,
 		Logger:                 newLogger,
@@ -44,11 +47,6 @@ func NewSqliteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	db.AutoMigrate(&model.Poll{})
 	db.AutoMigrate(&model.PollOption{})
 	db.AutoMigrate(&model.Schedule{})
-
-	err = db.Exec("PRAGMA foreign_keys = ON").Error
-	if err != nil {
-		panic(err)
-	}
 
 	// Seed data
 	seedRoles(db)

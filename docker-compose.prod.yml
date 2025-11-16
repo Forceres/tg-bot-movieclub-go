@@ -13,15 +13,17 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_GROUP_ID=${TELEGRAM_GROUP_ID}
       - TELEGRAM_WEBHOOK_SECRET_TOKEN=${TELEGRAM_WEBHOOK_SECRET_TOKEN}
-      - DATABASE_NAME=/root/data/db.sqlite3
       - KINOPOISK_API_VERSION=${KINOPOISK_API_VERSION:-v2.2}
       - KINOPOISK_API_KEY=${KINOPOISK_API_KEY}
       - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
       - REDIS_URL=${REDIS_URL}
       - NODE_ENV=PRODUCTION
       - DOMAIN_ADDRESS=${DOMAIN_ADDRESS}
-    volumes:
-      - /root/data/db.sqlite3:/root/data/db.sqlite3:rw
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PORT=${DATABASE_PORT}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASS=${DATABASE_PASS}
     networks:
       - movieclub-network
     logging:
@@ -41,13 +43,15 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_GROUP_ID=${TELEGRAM_GROUP_ID}
-      - DATABASE_NAME=/root/data/db.sqlite3
       - REDIS_URL=${REDIS_URL}
       - KINOPOISK_API_VERSION=${KINOPOISK_API_VERSION:-v2.2}
       - KINOPOISK_API_KEY=${KINOPOISK_API_KEY}
       - KINOPOISK_API_URL=${KINOPOISK_API_URL:-https://kinopoiskapiunofficial.tech/api}
-    volumes:
-      - /root/data/db.sqlite3:/root/data/db.sqlite3:rw
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PORT=${DATABASE_PORT}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASS=${DATABASE_PASS}
     networks:
       - movieclub-network
     logging:
