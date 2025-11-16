@@ -37,7 +37,6 @@ func escapeSQLString(s string) string {
 }
 
 func main() {
-	// Read movies.json
 	data, err := os.ReadFile("movies.json")
 	if err != nil {
 		log.Fatalf("Failed to read movies.json: %v", err)
@@ -48,22 +47,18 @@ func main() {
 		log.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
 
-	// Create SQL file
 	sqlFile, err := os.Create("movies_insert.sql")
 	if err != nil {
 		log.Fatalf("Failed to create SQL file: %v", err)
 	}
 	defer sqlFile.Close()
 
-	// Write header
 	sqlFile.WriteString("-- Movies INSERT statements\n")
 	sqlFile.WriteString("-- Generated at: " + time.Now().Format(time.RFC3339) + "\n\n")
 
-	// Generate INSERT statements
 	for _, movie := range movies {
 		var createdAt, updatedAt, deletedAt, finishedAt, suggestedAt, suggestedBy string
 
-		// Handle timestamps
 		if !movie.CreatedAt.IsZero() && movie.CreatedAt.Year() > 1 {
 			createdAt = fmt.Sprintf("'%s'", movie.CreatedAt.Format("2006-01-02 15:04:05"))
 		} else {
@@ -105,7 +100,6 @@ func main() {
 			suggestedBy = "NULL"
 		}
 
-		// Escape strings for SQL
 		title := escapeSQLString(movie.Title)
 		description := escapeSQLString(movie.Description)
 		directors := escapeSQLString(movie.Directors)
@@ -114,7 +108,6 @@ func main() {
 		link := escapeSQLString(movie.Link)
 		status := escapeSQLString(movie.Status)
 
-		// Generate INSERT statement
 		sql := fmt.Sprintf(
 			`INSERT INTO movies (created_at, updated_at, deleted_at, id, title, description, directors, year, countries, genres, link, duration, imdb_rating, rating, status, watch_count, finished_at, suggested_at, suggested_by)
 VALUES (%s, %s, %s, %d, '%s', '%s', '%s', %d, '%s', '%s', '%s', %d, %.1f, %.1f, '%s', %d, %s, %s, %s);
