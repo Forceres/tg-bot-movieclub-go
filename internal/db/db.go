@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func NewSqliteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
+func NewPostgresDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
 		logger.Config{

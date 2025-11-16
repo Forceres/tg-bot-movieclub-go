@@ -176,7 +176,7 @@ func LoadServices(cfg *config.Config) *Services {
 	client := asynq.NewClient(connOpt)
 	inspector := asynq.NewInspector(connOpt)
 
-	db, err := db.NewSqliteDB(cfg.Database)
+	db, err := db.NewPostgresDB(cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
