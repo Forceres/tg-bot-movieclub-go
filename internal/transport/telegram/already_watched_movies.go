@@ -176,13 +176,6 @@ func (h *AlreadyWatchedMoviesHandler) createInitialMessage(ctx context.Context, 
 	if err != nil {
 		log.Printf("Error pinning message: %v", err)
 	}
-	_, err = b.DeleteMessage(ctx, &bot.DeleteMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		MessageID: data.MessageID - 1,
-	})
-	if err != nil {
-		log.Printf("Error deleting message: %v", err)
-	}
 }
 
 func (h *AlreadyWatchedMoviesHandler) getChatData(chatID int64) *ChatData {

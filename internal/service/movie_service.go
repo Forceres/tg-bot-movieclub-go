@@ -23,8 +23,10 @@ const MOVIE_FORMAT = `
 <i>Ссылка на кинопоиск: %s.</i>
 `
 
-const ALREADY_WATCHED_MOVIES_FORMAT = `<p><b>#%d: %s (%d)</b>
-<b>Режиссер: %s <br>Страны выпуска: %s.</b>
+const ALREADY_WATCHED_MOVIES_FORMAT = `<p>
+<b>#%d: %s (%d)</b>
+<b>Режиссер(ы): %s.</b>
+<b>Страны выпуска: %s.</b>
 <b>Жанры: %s.</b>
 <b>Длительность в минутах: %d.</b>
 <b>Рейтинг IMDb: %f.</b>
@@ -183,7 +185,7 @@ func (s *MovieService) GetSuggestedOrWatchedMovies(suggested bool) ([][]string, 
 	}
 	list := make([][]string, len(movies))
 	for i, movie := range movies {
-		movieString := fmt.Sprintf(`%d. %s (%d)`, movie.ID, movie.Title, movie.Year)
+		movieString := fmt.Sprintf(`%d. %s (%d)`, i+1, movie.Title, movie.Year)
 		if movie.Suggester != nil {
 			movieString += fmt.Sprintf(" - предложил: %s %s", movie.Suggester.FirstName, movie.Suggester.LastName)
 		}
@@ -205,7 +207,16 @@ func (s *MovieService) generateHTMLForWatchedMovies(movies []*model.Movie) []str
 		if movie.Suggester != nil {
 			suggestedBy = fmt.Sprintf("%s %s", movie.Suggester.FirstName, movie.Suggester.LastName)
 		}
-		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, *movie.FinishedAt, suggestedBy, movie.Link))
+		var finishedAt string = "N/A"
+		if movie.FinishedAt != nil {
+			tm, err := time.Parse("2006-01-02 15:04:05", *movie.FinishedAt)
+			if err != nil {
+				fmt.Println("Error parsing time:", err)
+			} else {
+				finishedAt = monday.Format(tm, "02 January 2006", monday.LocaleRuRU)
+			}
+		}
+		html.WriteString(fmt.Sprintf(ALREADY_WATCHED_MOVIES_FORMAT, i+1, movie.Title, movie.Year, movie.Directors, movie.Countries, movie.Genres, movie.Duration, movie.IMDBRating, rating, finishedAt, suggestedBy, movie.Link))
 
 		if (i+1)%ALREADY_WATCHED_MOVIES_PAGE_SIZE == 0 || i == len(movies)-1 {
 			pages = append(pages, html.String())

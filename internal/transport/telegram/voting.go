@@ -209,7 +209,7 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	if err != nil || len(movies) == 0 {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "📭 Увы фильмов нет.",
+			Text:   "📭 Увы фильмов в предложке нет.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
