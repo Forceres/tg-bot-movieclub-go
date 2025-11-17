@@ -190,7 +190,7 @@ func (h *ScheduleHandler) SaveSchedule(f *fsm.FSM, args ...any) {
 	location, _ := f.Get(userID, "location")
 	date, _ := f.Get(userID, "date")
 	schedule := &model.Schedule{
-		Weekday:  int(date.(time.Time).Weekday()) + 1,
+		Weekday:  int(date.(time.Time).Weekday()),
 		Hour:     hour.(int),
 		Minute:   minute.(int),
 		IsActive: true,
