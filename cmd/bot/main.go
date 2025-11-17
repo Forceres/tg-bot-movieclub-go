@@ -116,18 +116,18 @@ func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, ha
 		return err
 	}
 	// Cleanup function to delete webhook on exit
-	defer func() {
-		log.Println("Deleting webhook...")
-		deleteCtx := context.Background()
-		ok, err := b.DeleteWebhook(deleteCtx, &bot.DeleteWebhookParams{
-			DropPendingUpdates: true,
-		})
-		if err != nil {
-			log.Printf("Failed to delete webhook: %v", err)
-		} else if ok {
-			log.Println("Webhook deleted successfully")
-		}
-	}()
+	// defer func() {
+	// 	log.Println("Deleting webhook...")
+	// 	deleteCtx := context.Background()
+	// 	ok, err := b.DeleteWebhook(deleteCtx, &bot.DeleteWebhookParams{
+	// 		DropPendingUpdates: true,
+	// 	})
+	// 	if err != nil {
+	// 		log.Printf("Failed to delete webhook: %v", err)
+	// 	} else if ok {
+	// 		log.Println("Webhook deleted successfully")
+	// 	}
+	// }()
 	datepicker.ScheduleDatepicker(b, services.ScheduleDatepicker)
 	datepicker.SessionDatepicker(b, services.SessionDatepicker)
 	app.RegisterHandlers(b, handlers, services, cfg)
