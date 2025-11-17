@@ -50,13 +50,21 @@ func GetRelativeDate(params *GetRelativeDateParams) int64 {
 	var daysToAdd int
 
 	if weekday == day {
-		// If today is day
-		daysToAdd = 7
+		// If today is the target day
+		// Check if target time hasn't passed yet
+		targetTimeToday := time.Date(current.Year(), current.Month(), current.Day(), hour, minute, 0, 0, location)
+		if current.Before(targetTimeToday) {
+			// Time hasn't passed yet, use today
+			daysToAdd = 0
+		} else {
+			// Time has passed, use next week
+			daysToAdd = 7
+		}
 	} else if weekday < day {
-		// If before day
+		// If before target day
 		daysToAdd = day - weekday
 	} else {
-		// If after day
+		// If after target day
 		daysToAdd = 7 - (weekday - day)
 	}
 
