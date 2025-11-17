@@ -106,7 +106,7 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 
 	var createdIDs []int64
 	if len(lookupIDs) > 0 {
-		moviesDTO, err := h.kinopoiskService.SearchMovies(lookupIDs, update.Message.From.FirstName)
+		moviesDTO, err := h.kinopoiskService.SearchMovies(lookupIDs, update.Message.From.ID)
 		if err != nil {
 			log.Printf("kinopoisk search failed: %v", err)
 			_, err = b.SendMessage(ctx, &bot.SendMessageParams{

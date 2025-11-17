@@ -70,7 +70,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 		}
 		return
 	}
-	moviesDto, err := h.kinopoiskService.SearchMovies(idsToFind, update.Message.From.FirstName)
+	moviesDto, err := h.kinopoiskService.SearchMovies(idsToFind, update.Message.From.ID)
 	if err != nil {
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,

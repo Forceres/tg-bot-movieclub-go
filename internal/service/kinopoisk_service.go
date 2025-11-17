@@ -17,7 +17,7 @@ type MovieDTO struct {
 	Link        string   `json:"link"`
 	Duration    int      `json:"duration"`
 	IMDBRating  float64  `json:"imdb"`
-	SuggestedBy string   `json:"suggested_by"`
+	SuggestedBy *int64   `json:"suggested_by"`
 }
 
 type KinopoiskService struct {
@@ -25,8 +25,8 @@ type KinopoiskService struct {
 }
 
 type IKinopoiskService interface {
-	SearchMovies(ids []int64, suggestedBy string) ([]MovieDTO, error)
-	ParseMovies(response *[]kinopoisk.KinopoiskMovieWithStaff, suggestedBy *string) ([]MovieDTO, error)
+	SearchMovies(ids []int64, suggestedBy int64) ([]MovieDTO, error)
+	ParseMovies(response *[]kinopoisk.KinopoiskMovieWithStaff, suggestedBy *int64) ([]MovieDTO, error)
 }
 
 func NewKinopoiskService(kinopoiskAPI kinopoisk.IKinopoiskAPI) *KinopoiskService {
@@ -35,7 +35,7 @@ func NewKinopoiskService(kinopoiskAPI kinopoisk.IKinopoiskAPI) *KinopoiskService
 	}
 }
 
-func (s *KinopoiskService) SearchMovies(ids []int64, suggestedBy string) ([]MovieDTO, error) {
+func (s *KinopoiskService) SearchMovies(ids []int64, suggestedBy int64) ([]MovieDTO, error) {
 	movies, err := s.kinopoiskAPI.SearchMovies(ids)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func (s *KinopoiskService) SearchMovies(ids []int64, suggestedBy string) ([]Movi
 	return s.ParseMovies(movies, &suggestedBy)
 }
 
-func (s *KinopoiskService) ParseMovies(response *[]kinopoisk.KinopoiskMovieWithStaff, suggestedBy *string) ([]MovieDTO, error) {
+func (s *KinopoiskService) ParseMovies(response *[]kinopoisk.KinopoiskMovieWithStaff, suggestedBy *int64) ([]MovieDTO, error) {
 	var moviesDto []MovieDTO
 	for _, item := range *response {
 		var movieDto MovieDTO
@@ -70,7 +70,7 @@ func (s *KinopoiskService) ParseMovies(response *[]kinopoisk.KinopoiskMovieWithS
 		movieDto.Year = item.Movie.Year
 		movieDto.Duration = item.Movie.FilmLength
 		movieDto.IMDBRating = item.Movie.RatingImdb
-		movieDto.SuggestedBy = *suggestedBy
+		movieDto.SuggestedBy = suggestedBy
 		moviesDto = append(moviesDto, movieDto)
 	}
 	return moviesDto, nil

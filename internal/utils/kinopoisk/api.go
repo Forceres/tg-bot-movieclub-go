@@ -130,7 +130,7 @@ func (k *KinopoiskAPI) APIGetCall(url string) ([]byte, error) {
 }
 
 func (k *KinopoiskAPI) SearchMovie(movieId int64) (*KinopoiskMovie, error) {
-	var url string = fmt.Sprintf(k.APIUrl, k.APIVersion) + fmt.Sprintf(MOVIES+"/%d", movieId)
+	var url string = k.APIUrl + k.APIVersion + fmt.Sprintf(MOVIES+"/%d", movieId)
 	body, err := k.APIGetCall(url)
 	if err != nil {
 		log.Printf("Error fetching movie: %v", err)
@@ -168,7 +168,7 @@ func (k *KinopoiskAPI) SearchMovies(ids []int64) (*[]KinopoiskMovieWithStaff, er
 }
 
 func (k *KinopoiskAPI) SearchStaff(movieId int64) (*[]KinopoiskStaff, error) {
-	var url string = fmt.Sprintf(k.APIUrl+"%s?filmId=%d", "v1", STAFF, movieId)
+	var url string = fmt.Sprintf(k.APIUrl+"v1"+"%s?filmId=%d", STAFF, movieId)
 	var staff []KinopoiskStaff
 	body, err := k.APIGetCall(url)
 	if err != nil {
