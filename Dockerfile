@@ -1,7 +1,7 @@
 # Build stage
 FROM golang:1.25.3-alpine AS builder
 
-RUN apk add --no-cache git gcc musl-dev sqlite-dev tzdata
+RUN apk add --no-cache git gcc musl-dev tzdata
 
 WORKDIR /app
 
@@ -18,9 +18,11 @@ RUN CGO_ENABLED=1 GOOS=linux go build -o /app/bin/${BUILD_TARGET} ./cmd/${BUILD_
 # Runtime stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates sqlite-libs
+RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /root/
+
+ENV TZ=Europe/Moscow
 
 ARG BUILD_TARGET=bot
 
