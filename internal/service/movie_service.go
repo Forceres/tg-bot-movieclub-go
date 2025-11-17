@@ -143,7 +143,7 @@ func (s *MovieService) GetCurrentMovies() (*string, error) {
 			suggestedBy = fmt.Sprintf("%s %s", movie.Suggester.FirstName, movie.Suggester.LastName)
 		}
 		formattedMovies[i+offset] = fmt.Sprintf(MOVIE_FORMAT,
-			movie.ID,
+			i+1,
 			movie.Title,
 			movie.Genres,
 			movie.Countries,
