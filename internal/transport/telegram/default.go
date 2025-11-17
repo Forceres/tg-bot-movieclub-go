@@ -304,11 +304,8 @@ func (h *DefaultHandler) Handle(ctx context.Context, b *bot.Bot, update *models.
 			return
 		}
 		h.f.Set(userID, "location", location.String())
-		value, ok := h.f.Get(userID, "datepicker")
+		value, _ := h.f.Get(userID, "datepicker")
 		var state fsm.StateID
-		if !ok {
-			return
-		}
 		if value == "session" {
 			state = stateRescheduleSession
 		} else {
