@@ -132,7 +132,7 @@ func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, ha
 	datepicker.SessionDatepicker(b, services.SessionDatepicker)
 	app.RegisterHandlers(b, handlers, services, cfg)
 	ok, err := b.SetWebhook(ctx, &bot.SetWebhookParams{
-		URL:                cfg.DomainAddress,
+		URL:                cfg.DomainAddress + "/webhook",
 		DropPendingUpdates: true,
 		SecretToken:        cfg.Telegram.WebhookSecretToken,
 		AllowedUpdates:     allowedUpdates,
@@ -142,9 +142,19 @@ func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, ha
 		return err
 	}
 	go b.StartWebhook(ctx)
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("ok"))
+	})
+
+	mux.Handle("/webhook", b.WebhookHandler())
+
 	server := &http.Server{
 		Addr:    ":2000",
-		Handler: b.WebhookHandler(),
+		Handler: mux,
 	}
 	// Handle graceful shutdown
 	go func() {

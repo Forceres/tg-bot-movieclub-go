@@ -26,6 +26,12 @@ services:
       - DATABASE_PASS=${DATABASE_PASS}
     networks:
       - movieclub-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     logging:
       driver: "json-file"
       options:
@@ -40,6 +46,7 @@ services:
         BUILD_TARGET: worker
     container_name: movieclub-worker
     restart: unless-stopped
+    exclude_from_hc: true
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_GROUP_ID=${TELEGRAM_GROUP_ID}
