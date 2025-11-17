@@ -10,7 +10,7 @@ import (
 
 func Delete(next bot.HandlerFunc) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
-		if update.Message != nil {
+		if update.Message != nil && update.Message.From != nil && update.Message.From.ID != b.ID() {
 			_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
 				ChatID:    update.Message.Chat.ID,
 				MessageID: update.Message.ID,
