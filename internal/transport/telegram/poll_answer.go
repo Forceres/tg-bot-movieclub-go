@@ -45,11 +45,11 @@ func (h *PollAnswerHandler) Handle(ctx context.Context, b *bot.Bot, update *mode
 			UserID:   update.PollAnswer.User.ID,
 		}
 
-		if poll.Type == RATING_TYPE {
+		if poll.Type == model.VOTING_RATING_TYPE {
 			rating := optionID + 1
 			vote.Rating = &rating
 			vote.MovieID = poll.MovieID
-		} else if poll.Type == SELECTION_TYPE {
+		} else if poll.Type == model.VOTING_SELECTION_TYPE {
 			options, err := h.pollService.GetPollOptionsByPollID(poll.ID)
 			if err != nil {
 				log.Printf("Error getting poll options: %v", err)

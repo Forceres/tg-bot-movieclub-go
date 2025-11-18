@@ -100,7 +100,7 @@ func (h *SuggestMovieHandler) Handle(ctx context.Context, b *bot.Bot, update *mo
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "✅ Фильмы успешно добавлены в предложку!",
+		Text:   "✅ Фильм(ы) успешно добавлен(ы) в предложку!",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)

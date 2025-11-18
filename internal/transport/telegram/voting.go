@@ -33,11 +33,6 @@ var RATING_VOTING_OPTIONS = []models.InputPollOption{
 	{Text: "10"},
 }
 
-const (
-	RATING_TYPE    = "rating"
-	SELECTION_TYPE = "selection"
-)
-
 type VotingHandler struct {
 	movieService  service.IMovieService
 	votingService service.IVotingService
@@ -81,8 +76,8 @@ func (h *VotingHandler) PrepareVotingType(f *fsm.FSM, args ...any) {
 	opts := []keyboard.Option{}
 	kb := keyboard.New(b, opts...).
 		Row().
-		Button("Выбор фильма", []byte(SELECTION_TYPE), h.onInlineKeyboardSelect).
-		Button("Оценка фильма", []byte(RATING_TYPE), h.onInlineKeyboardSelect).
+		Button("Выбор фильма", []byte(model.VOTING_SELECTION_TYPE), h.onInlineKeyboardSelect).
+		Button("Оценка фильма", []byte(model.VOTING_RATING_TYPE), h.onInlineKeyboardSelect).
 		Row().
 		Button("Отменить", []byte("cancel"), h.onCancelSelect)
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
@@ -103,7 +98,7 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 	}
 	selection := string(data)
 	switch selection {
-	case SELECTION_TYPE:
+	case model.VOTING_SELECTION_TYPE:
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "🎬 Вы выбрали 'Выбор фильма'. Начинаем процесс выбора фильма.",
@@ -113,7 +108,7 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 		}
 		h.fsm.Set(userID, "type", selection)
 		h.fsm.Transition(userID, statePrepareVotingTitle, userID, ctx, b, update)
-	case RATING_TYPE:
+	case model.VOTING_RATING_TYPE:
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "⭐ Вы выбрали 'Оценка фильма'. Начинаем процесс оценки фильма.",
@@ -201,9 +196,9 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	var movies [][]string
 	var err error
 	switch votingType {
-	case SELECTION_TYPE:
+	case model.VOTING_SELECTION_TYPE:
 		movies, err = h.movieService.GetSuggestedOrWatchedMovies(true)
-	case RATING_TYPE:
+	case model.VOTING_RATING_TYPE:
 		movies, err = h.movieService.GetSuggestedOrWatchedMovies(false)
 	}
 	if err != nil || len(movies) == 0 {
@@ -263,7 +258,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 	title, _ := h.fsm.Get(userID, "title")
 	finishedAt := time.Now().Add(time.Duration(duration.(int)) * time.Hour).Unix()
 	switch votingType.(string) {
-	case SELECTION_TYPE:
+	case model.VOTING_SELECTION_TYPE:
 		movies, _ := f.Get(userID, "movies")
 		movieIDs := []int64{}
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
@@ -327,7 +322,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 		if err != nil {
 			log.Printf("Error scheduling close rating voting task: %v", err)
 		}
-	case RATING_TYPE:
+	case model.VOTING_RATING_TYPE:
 		movies, _ := f.Get(userID, "movies")
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		for _, index := range selectedMovieIndexes.([]int64) {

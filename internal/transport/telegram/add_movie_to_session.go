@@ -234,16 +234,16 @@ func (h *AddMovieToSessionHandler) Handle(ctx context.Context, b *bot.Bot, updat
 
 	var responseText string
 	if sessionCreated {
-		responseText = fmt.Sprintf("✅ Создана новая сессия с %d фильмами.\n", len(targetIDs))
+		responseText = fmt.Sprintf("✅ Создана новая сессия с %d фильмом(ами).\n", len(targetIDs))
 	} else {
-		responseText = fmt.Sprintf("✅ Добавлено %d новых фильмов в текущую сессию.\n", len(newSessionMovieIDs))
+		responseText = fmt.Sprintf("✅ Добавлено %d новый(х) фильм(ов) в текущую сессию.\n", len(newSessionMovieIDs))
 	}
 
 	if len(existingIDs) > 0 {
-		responseText += fmt.Sprintf("ℹ️ %d фильмов уже были в базе.\n", len(existingIDs))
+		responseText += fmt.Sprintf("ℹ️ %d фильм(ов) уже были в базе.\n", len(existingIDs))
 	}
 	if len(createdIDs) > 0 {
-		responseText += fmt.Sprintf("🆕 %d новых фильмов добавлено в базу.\n", len(createdIDs))
+		responseText += fmt.Sprintf("🆕 %d новый(х) фильм(ов) добавлено в базу.\n", len(createdIDs))
 	}
 
 	if session.FinishedAt > 0 {
