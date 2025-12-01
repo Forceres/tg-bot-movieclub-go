@@ -106,6 +106,7 @@ func (s *SessionService) FinishSession(sessionID int64) error {
 		for _, movie := range movies {
 			movie.WatchCount += 1
 			movie.FinishedAt = &finishedAt
+			movie.Status = model.MOVIE_WATCHED_STATUS
 			if err := s.movieRepo.Update(&repository.UpdateParams{Movie: movie, Tx: tx}); err != nil {
 				return err
 			}
