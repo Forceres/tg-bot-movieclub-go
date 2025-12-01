@@ -22,22 +22,23 @@ import (
 )
 
 const (
-	statePrepareVotingType     fsm.StateID = "prepare_voting_type"
-	statePrepareVotingTitle    fsm.StateID = "prepare_voting_title"
-	statePrepareVotingDuration fsm.StateID = "prepare_voting_duration"
-	statePrepareMovies         fsm.StateID = "prepare_movies"
-	stateStartVoting           fsm.StateID = "start_voting"
-	statePrepareCancelIDs      fsm.StateID = "prepare_cancel_ids"
-	stateCancel                fsm.StateID = "cancel"
-	stateDate                  fsm.StateID = "date"
-	stateTime                  fsm.StateID = "time"
-	stateLocation              fsm.StateID = "location"
-	stateSaveSchedule          fsm.StateID = "save_schedule"
-	stateRescheduleSession     fsm.StateID = "reschedule_session"
-	statePrepareMoviesToDelete fsm.StateID = "prepare_movies_to_delete"
-	stateRemove                fsm.StateID = "remove"
-	stateDescription           fsm.StateID = "description"
-	stateSaveDescription       fsm.StateID = "save_description"
+	statePrepareVotingType       fsm.StateID = "prepare_voting_type"
+	statePrepareVotingTitle      fsm.StateID = "prepare_voting_title"
+	statePrepareVotingDuration   fsm.StateID = "prepare_voting_duration"
+	statePrepareMovies           fsm.StateID = "prepare_movies"
+	stateStartVoting             fsm.StateID = "start_voting"
+	statePrepareCancelIDs        fsm.StateID = "prepare_cancel_ids"
+	stateCancel                  fsm.StateID = "cancel"
+	stateDate                    fsm.StateID = "date"
+	stateTime                    fsm.StateID = "time"
+	stateLocation                fsm.StateID = "location"
+	stateSaveSchedule            fsm.StateID = "save_schedule"
+	stateRescheduleSession       fsm.StateID = "reschedule_session"
+	statePrepareMoviesToDelete   fsm.StateID = "prepare_movies_to_delete"
+	stateRemove                  fsm.StateID = "remove"
+	stateDescription             fsm.StateID = "description"
+	stateSaveDescription         fsm.StateID = "save_description"
+	statePrepareMovieSuggestions fsm.StateID = "prepare_movie_suggestions"
 )
 
 func PollAnswerMatchFunc() bot.MatchFunc {
@@ -64,6 +65,7 @@ type Handlers struct {
 	RemoveMovieFromSessionHandler   bot.HandlerFunc
 	AddMovieToSessionHandler        bot.HandlerFunc
 	CustomSessionDescriptionHandler bot.HandlerFunc
+	SuggestionsHandler              bot.HandlerFunc
 }
 
 type Middlewares struct {
@@ -117,6 +119,7 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 	removeMovieFromSessionHandler := telegram.NewRemoveMovieFromSessionHandler(services.SessionService, services.AsynqInspector, f)
 	customSessionDescriptionHandler := telegram.NewCustomSessionDescriptionHandler(services.SessionService, f)
 	addMovieToSessionHandler := telegram.NewAddMovieToSessionHandler(services.MovieService, services.KinopoiskService, services.SessionService, services.PollService, services.AsynqClient, services.AsynqInspector)
+	suggestionsHandler := telegram.NewSuggestionsHandler(services.MovieService, f)
 
 	handlers := &Handlers{
 		HelpHandler:                     telegram.HelpHandler,
@@ -136,25 +139,27 @@ func LoadApp(cfg *config.Config, f *fsm.FSM) (*Handlers, *Middlewares, *Services
 		RemoveMovieFromSessionHandler:   removeMovieFromSessionHandler.Handle,
 		AddMovieToSessionHandler:        addMovieToSessionHandler.Handle,
 		CustomSessionDescriptionHandler: customSessionDescriptionHandler.Handle,
+		SuggestionsHandler:              suggestionsHandler.Handle,
 	}
 
 	f.AddCallbacks(map[fsm.StateID]fsm.Callback{
-		statePrepareVotingType:     votingHandler.PrepareVotingType,
-		statePrepareVotingTitle:    votingHandler.PrepareVotingTitle,
-		statePrepareVotingDuration: votingHandler.PrepareVotingDuration,
-		statePrepareMovies:         votingHandler.PrepareMovies,
-		stateStartVoting:           votingHandler.StartVoting,
-		stateCancel:                cancelVotingHandler.Cancel,
-		statePrepareCancelIDs:      cancelVotingHandler.PrepareCancelIDs,
-		stateDate:                  scheduleHandler.PrepareDate,
-		stateTime:                  scheduleHandler.PrepareTime,
-		stateLocation:              scheduleHandler.PrepareLocation,
-		stateSaveSchedule:          scheduleHandler.SaveSchedule,
-		stateRescheduleSession:     rescheduleSessionHandler.RescheduleSession,
-		statePrepareMoviesToDelete: removeMovieFromSessionHandler.PrepareMoviesToDelete,
-		stateRemove:                removeMovieFromSessionHandler.Remove,
-		stateDescription:           customSessionDescriptionHandler.HandleDescriptionInput,
-		stateSaveDescription:       customSessionDescriptionHandler.SaveDescription,
+		statePrepareVotingType:       votingHandler.PrepareVotingType,
+		statePrepareVotingTitle:      votingHandler.PrepareVotingTitle,
+		statePrepareVotingDuration:   votingHandler.PrepareVotingDuration,
+		statePrepareMovies:           votingHandler.PrepareMovies,
+		stateStartVoting:             votingHandler.StartVoting,
+		stateCancel:                  cancelVotingHandler.Cancel,
+		statePrepareCancelIDs:        cancelVotingHandler.PrepareCancelIDs,
+		stateDate:                    scheduleHandler.PrepareDate,
+		stateTime:                    scheduleHandler.PrepareTime,
+		stateLocation:                scheduleHandler.PrepareLocation,
+		stateSaveSchedule:            scheduleHandler.SaveSchedule,
+		stateRescheduleSession:       rescheduleSessionHandler.RescheduleSession,
+		statePrepareMoviesToDelete:   removeMovieFromSessionHandler.PrepareMoviesToDelete,
+		stateRemove:                  removeMovieFromSessionHandler.Remove,
+		stateDescription:             customSessionDescriptionHandler.HandleDescriptionInput,
+		stateSaveDescription:         customSessionDescriptionHandler.SaveDescription,
+		statePrepareMovieSuggestions: suggestionsHandler.PrepareMovies,
 	})
 
 	middlewares := &Middlewares{
@@ -241,6 +246,7 @@ func RegisterHandlers(b *bot.Bot, handlers *Handlers, services *Services, cfg *c
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#предлагаю", bot.MatchTypePrefix, handlers.SuggestMovieHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#расписание", bot.MatchTypeExact, handlers.ScheduleHandler, middleware.Delete)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "#перенос", bot.MatchTypeExact, handlers.RescheduleSessionHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "#предложка", bot.MatchTypeExact, handlers.SuggestionsHandler, middleware.Delete)
 	registerCommandHandler(b, "help", handlers.HelpHandler, middleware.Delete)
 	registerCommandHandler(b, "now", handlers.CurrentMoviesHandler, middleware.Delete)
 	registerCommandHandler(b, "already", handlers.AlreadyWatchedMoviesHandler, middleware.AdminOnly(cfg.Telegram.GroupID, services.UserService), middleware.Delete)
