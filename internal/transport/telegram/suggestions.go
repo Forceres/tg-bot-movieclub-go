@@ -62,6 +62,7 @@ func (h *SuggestionsHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	}
 	opts := []paginator.Option{
 		paginator.PerPage(5),
+		paginator.WithCloseButton("Закрыть"),
 	}
 	var paginatedMovies []string
 	for _, movie := range movies {
