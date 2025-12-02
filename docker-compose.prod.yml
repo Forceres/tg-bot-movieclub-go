@@ -24,8 +24,6 @@ services:
       - DATABASE_PORT=${DATABASE_PORT}
       - DATABASE_USER=${DATABASE_USER}
       - DATABASE_PASS=${DATABASE_PASS}
-    networks:
-      - movieclub-network
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:2000/health"]
       interval: 5s
@@ -59,14 +57,8 @@ services:
       - DATABASE_PORT=${DATABASE_PORT}
       - DATABASE_USER=${DATABASE_USER}
       - DATABASE_PASS=${DATABASE_PASS}
-    networks:
-      - movieclub-network
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-
-networks:
-  movieclub-network:
-    driver: bridge

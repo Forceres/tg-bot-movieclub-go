@@ -133,7 +133,7 @@ func startWebhook(ctx context.Context, opts []bot.Option, cfg *config.Config, ha
 	app.RegisterHandlers(b, handlers, services, cfg)
 	ok, err := b.SetWebhook(ctx, &bot.SetWebhookParams{
 		URL:                cfg.DomainAddress + "/webhook",
-		DropPendingUpdates: true,
+		DropPendingUpdates: false,
 		SecretToken:        cfg.Telegram.WebhookSecretToken,
 		AllowedUpdates:     allowedUpdates,
 	})
