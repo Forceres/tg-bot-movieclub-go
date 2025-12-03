@@ -7,7 +7,7 @@ import (
 )
 
 type IVoteService interface {
-	Create(vote *model.Vote) error
+	CreateMultiple(votingID int64, userID int64, votes []*model.Vote) error
 	CalculateRatingMean(votingID int64) (float64, error)
 	CalculateMaxMovieCount(votingID int64) (int64, int64, error)
 }
@@ -28,22 +28,25 @@ func (s *VoteService) CalculateMaxMovieCount(votingID int64) (int64, int64, erro
 	return s.repo.CalculateMaxMovieCount(votingID)
 }
 
-func (s *VoteService) Create(vote *model.Vote) error {
+func (s *VoteService) CreateMultiple(votingID int64, userID int64, votes []*model.Vote) error {
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
 		deleteParams := &repository.DeleteByUserIdAndVotingIdParams{
-			UserID:   vote.UserID,
-			VotingID: vote.VotingID,
+			UserID:   userID,
+			VotingID: votingID,
 			Tx:       tx,
 		}
 		if err := s.repo.DeleteByUserIdAndVotingId(deleteParams); err != nil {
 			return err
 		}
-		createParams := &repository.CreateVoteParams{
-			Vote: vote,
-			Tx:   tx,
-		}
-		if err := s.repo.Create(createParams); err != nil {
-			return err
+
+		for _, vote := range votes {
+			createParams := &repository.CreateVoteParams{
+				Vote: vote,
+				Tx:   tx,
+			}
+			if err := s.repo.Create(createParams); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

@@ -41,6 +41,7 @@ type StartRatingVotingParams struct {
 	ChatID      int64
 	Options     VotingOptions
 	Question    string
+	Multi       *bool
 	PollOptions []models.InputPollOption
 }
 
@@ -199,6 +200,10 @@ func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Pol
 		if params.Options.SessionID != nil {
 			voting.SessionID = params.Options.SessionID
 		}
+		if params.Multi == nil {
+			params.Multi = new(bool)
+			*params.Multi = false
+		}
 		createdVoting, err := s.repo.CreateVoting(&repository.CreateVotingParams{
 			Voting: voting,
 			Tx:     tx,
@@ -211,12 +216,13 @@ func (s *VotingService) StartVoting(params *StartRatingVotingParams) (*model.Pol
 			return err
 		}
 		pollMsg, err := params.Bot.SendPoll(params.Context, &bot.SendPollParams{
-			ChatID:            params.ChatID,
-			Question:          bot.EscapeMarkdownUnescaped(params.Question),
-			Options:           params.PollOptions,
-			IsAnonymous:       bot.False(),
-			Type:              "regular",
-			QuestionParseMode: models.ParseModeMarkdown,
+			ChatID:                params.ChatID,
+			Question:              bot.EscapeMarkdownUnescaped(params.Question),
+			Options:               params.PollOptions,
+			IsAnonymous:           bot.False(),
+			AllowsMultipleAnswers: *params.Multi,
+			Type:                  "regular",
+			QuestionParseMode:     models.ParseModeMarkdown,
 		})
 		if err != nil {
 			log.Printf("Error sending poll: %v", err)

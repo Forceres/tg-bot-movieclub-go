@@ -288,8 +288,10 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			if len(parts) == 2 {
 				title = parts[1]
 			}
-			pollOpts = append(pollOpts, models.InputPollOption{Text: title})
+			pollOpts = append(pollOpts, models.InputPollOption{Text: title, TextParseMode: models.ParseModeMarkdown})
 		}
+		multi := new(bool)
+		*multi = true
 		poll, err := h.votingService.StartVoting(&service.StartRatingVotingParams{
 			Bot:     b,
 			Context: ctx,
@@ -300,6 +302,7 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 				CreatedBy:  userID,
 				FinishedAt: &finishedAt,
 			},
+			Multi:       multi,
 			PollOptions: pollOpts,
 			Question:    title.(string),
 		})
@@ -336,7 +339,6 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		moviesArray := movies.([][]string)
 		for _, index := range selectedMovieIndexes.([]int64) {
-			// User enters 1-based index (1, 2, 3...), convert to 0-based array index
 			arrayIndex := int(index) - 1
 			if arrayIndex < 0 || arrayIndex >= len(moviesArray) {
 				log.Printf("Index out of bounds: user entered %d, array length is %d", index, len(moviesArray))

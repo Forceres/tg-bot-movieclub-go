@@ -34,10 +34,13 @@ func (h *PollAnswerHandler) Handle(ctx context.Context, b *bot.Bot, update *mode
 		return
 	}
 
-	log.Printf("User %d voted in poll %s (type: %s)\n",
+	log.Printf("User %d voted in poll %s (type: %s), selected options: %v\n",
 		update.PollAnswer.User.ID,
 		update.PollAnswer.PollID,
-		poll.Type)
+		poll.Type,
+		update.PollAnswer.OptionIDs)
+
+	votes := []*model.Vote{}
 
 	for _, optionID := range update.PollAnswer.OptionIDs {
 		vote := &model.Vote{
@@ -64,8 +67,10 @@ func (h *PollAnswerHandler) Handle(ctx context.Context, b *bot.Bot, update *mode
 			}
 		}
 
-		if err := h.voteService.Create(vote); err != nil {
-			log.Printf("Error saving vote: %v", err)
-		}
+		votes = append(votes, vote)
+	}
+
+	if err := h.voteService.CreateMultiple(poll.VotingID, update.PollAnswer.User.ID, votes); err != nil {
+		log.Printf("Error saving votes: %v", err)
 	}
 }
