@@ -11,7 +11,6 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
-	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/slice"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/keyboard"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -202,9 +201,15 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 		movies, err = h.movieService.GetSuggestedOrWatchedMovies(false)
 	}
 	if err != nil || len(movies) == 0 {
+		var errorMsg string
+		if votingType == model.VOTING_SELECTION_TYPE {
+			errorMsg = "📭 Увы фильмов в предложке нет."
+		} else {
+			errorMsg = "📭 Увы просмотренных фильмов нет."
+		}
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "📭 Увы фильмов в предложке нет.",
+			Text:   errorMsg,
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
@@ -237,7 +242,7 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	}
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "📝 Перечисли номера фильмов, которые должны быть оценены через запятую",
+		Text:   "📝 Перечисли номера фильмов, которые должны быть оценены или выбраны через запятую",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -263,19 +268,23 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 		movieIDs := []int64{}
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
 		pollOpts := []models.InputPollOption{}
+		moviesArray := movies.([][]string)
 		for _, index := range selectedMovieIndexes.([]int64) {
-			movieData := slice.GetByIndex(movies.([][]string), index)
-			if movieData == nil {
+			// User enters 1-based index (1, 2, 3...), convert to 0-based array index
+			arrayIndex := int(index) - 1
+			if arrayIndex < 0 || arrayIndex >= len(moviesArray) {
+				log.Printf("Index out of bounds: user entered %d, array length is %d", index, len(moviesArray))
 				continue
 			}
-			movieID, err := strconv.ParseInt((*movieData)[0], 10, 64)
+			movieData := moviesArray[arrayIndex]
+			movieID, err := strconv.ParseInt(movieData[0], 10, 64)
 			if err != nil {
 				log.Printf("Error converting movie ID: %v", err)
 				continue
 			}
 			movieIDs = append(movieIDs, movieID)
-			var title string = (*movieData)[1]
-			parts := strings.SplitN((*movieData)[1], ". ", 2)
+			var title string = movieData[1]
+			parts := strings.SplitN(movieData[1], ". ", 2)
 			if len(parts) == 2 {
 				title = parts[1]
 			}
@@ -325,14 +334,18 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 	case model.VOTING_RATING_TYPE:
 		movies, _ := f.Get(userID, "movies")
 		selectedMovieIndexes, _ := f.Get(userID, "movieIndexes")
+		moviesArray := movies.([][]string)
 		for _, index := range selectedMovieIndexes.([]int64) {
-			movieData := slice.GetByIndex(movies.([][]string), index)
-			if movieData == nil {
+			// User enters 1-based index (1, 2, 3...), convert to 0-based array index
+			arrayIndex := int(index) - 1
+			if arrayIndex < 0 || arrayIndex >= len(moviesArray) {
+				log.Printf("Index out of bounds: user entered %d, array length is %d", index, len(moviesArray))
 				continue
 			}
-			movieID, _ := strconv.ParseInt((*movieData)[0], 10, 64)
-			var title string = (*movieData)[1]
-			parts := strings.SplitN((*movieData)[1], ". ", 2)
+			movieData := moviesArray[arrayIndex]
+			movieID, _ := strconv.ParseInt(movieData[0], 10, 64)
+			var title string = movieData[1]
+			parts := strings.SplitN(movieData[1], ". ", 2)
 			if len(parts) == 2 {
 				title = parts[1]
 			}
