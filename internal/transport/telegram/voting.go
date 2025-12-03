@@ -11,6 +11,7 @@ import (
 	"github.com/Forceres/tg-bot-movieclub-go/internal/model"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/service"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/tasks"
+	fsmutils "github.com/Forceres/tg-bot-movieclub-go/internal/utils/fsm"
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/keyboard"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -98,22 +99,26 @@ func (h *VotingHandler) onInlineKeyboardSelect(ctx context.Context, b *bot.Bot, 
 	selection := string(data)
 	switch selection {
 	case model.VOTING_SELECTION_TYPE:
-		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "🎬 Вы выбрали 'Выбор фильма'. Начинаем процесс выбора фильма.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
+		} else {
+			fsmutils.AppendMessageID(h.fsm, userID, msg.ID)
 		}
 		h.fsm.Set(userID, "type", selection)
 		h.fsm.Transition(userID, statePrepareVotingTitle, userID, ctx, b, update)
 	case model.VOTING_RATING_TYPE:
-		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 			Text:   "⭐ Вы выбрали 'Оценка фильма'. Начинаем процесс оценки фильма.",
 		})
 		if err != nil {
 			log.Printf("Error sending message: %v", err)
+		} else {
+			fsmutils.AppendMessageID(h.fsm, userID, msg.ID)
 		}
 		h.fsm.Set(userID, "type", selection)
 		h.fsm.Transition(userID, statePrepareMovies, userID, ctx, b, update)
@@ -138,12 +143,14 @@ func (h *VotingHandler) PrepareVotingTitle(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	update := args[3].(*models.Update)
-	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.CallbackQuery.Message.Message.Chat.ID,
 		Text:   "📝 Введите название для голосования!",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
+	} else {
+		fsmutils.AppendMessageID(f, userID, msg.ID)
 	}
 }
 
@@ -156,12 +163,14 @@ func (h *VotingHandler) PrepareVotingDuration(f *fsm.FSM, args ...any) {
 	ctx := args[1].(context.Context)
 	b := args[2].(*bot.Bot)
 	update := args[3].(*models.Update)
-	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "⏱️ Введите длительность голосования (в часах)",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
+	} else {
+		fsmutils.AppendMessageID(f, userID, msg.ID)
 	}
 }
 
@@ -227,7 +236,7 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 	}
 	p := paginator.New(b, paginatedMovies, opts...)
 	showOpts := []paginator.ShowOption{}
-	_, err = p.Show(ctx, b, update.Message.Chat.ID, showOpts...)
+	msg, err := p.Show(ctx, b, update.Message.Chat.ID, showOpts...)
 	if err != nil {
 		log.Printf("Error showing paginator: %v", err)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
@@ -239,13 +248,17 @@ func (h *VotingHandler) PrepareMovies(f *fsm.FSM, args ...any) {
 		}
 		f.Reset(userID)
 		return
+	} else {
+		fsmutils.AppendMessageID(f, userID, msg.ID)
 	}
-	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "📝 Перечисли номера фильмов, которые должны быть оценены или выбраны через запятую",
 	})
 	if err != nil {
 		log.Printf("Error sending message: %v", err)
+	} else {
+		fsmutils.AppendMessageID(f, userID, msg.ID)
 	}
 }
 
@@ -385,5 +398,6 @@ func (h *VotingHandler) StartVoting(f *fsm.FSM, args ...any) {
 			}
 		}
 	}
+	fsmutils.DeleteMessages(ctx, b, f, userID, update.Message.From.ID)
 	h.fsm.Reset(userID)
 }
