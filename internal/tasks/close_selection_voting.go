@@ -102,7 +102,7 @@ func (t *CloseSelectionVotingTaskProcessor) Process(ctx context.Context, task *a
 		VotingID:  p.VotingID,
 		PollID:    p.PollID,
 		MovieID:   movie.ID,
-		CreatedBy: p.ChatID,
+		CreatedBy: p.UserID,
 	})
 	if err != nil {
 		log.Printf("Error finishing selection voting: %v", err)

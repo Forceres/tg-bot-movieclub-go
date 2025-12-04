@@ -69,7 +69,7 @@ func (r *SessionRepo) RescheduleSession(sessionID int64, finishedAt int64) error
 
 func (r *SessionRepo) FindOngoingSession() (*model.Session, error) {
 	var session model.Session
-	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Preload("Movies").Preload("Movies.Suggester").First(&session).Error
+	err := r.db.Where(&model.Session{Status: model.SESSION_ONGOING_STATUS}).Preload("Movies").First(&session).Error
 	if err != nil {
 		return nil, err
 	}
