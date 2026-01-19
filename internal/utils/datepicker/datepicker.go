@@ -72,7 +72,7 @@ func SessionDatepicker(b *bot.Bot, d *Datepicker) {
 		datepicker.From(date),
 		datepicker.OnCancel(d.OnDatepickerCancel),
 		datepicker.Language("ru"),
-		datepicker.WithPrefix("datepicker"),
+		datepicker.WithPrefix("datepicker-session"),
 	}
 	d.Datepicker = datepicker.New(
 		b,
