@@ -2,6 +2,7 @@ package datepicker
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/Forceres/tg-bot-movieclub-go/internal/utils/telegram/datepicker"
@@ -32,7 +33,10 @@ func (d *Datepicker) OnDatepickerCancel(ctx context.Context, b *bot.Bot, callbac
 }
 
 func (d *Datepicker) OnDatepickerSelect(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery, date time.Time) {
+	id := callbackQuery.Message.Message.From.ID
 	userID := callbackQuery.From.ID
+	log.Printf("id (datepicker): %d", id)
+	log.Printf("UserId (datepicker): %d", userID)
 	currentState := d.f.Current(userID)
 	if currentState == stateDefault {
 		return
