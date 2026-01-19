@@ -106,7 +106,6 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 	} else {
 		title = "Изменение расписания..."
 	}
-	//
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   title,
@@ -123,7 +122,7 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 	} else {
 		datepicker = h.datepicker
 	}
-	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
+	msg, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
 		Text:        "Выбери дату",
 		ReplyMarkup: datepicker.Datepicker,
@@ -131,7 +130,9 @@ func (h *ScheduleHandler) PrepareDate(f *fsm.FSM, args ...any) {
 	if err != nil {
 		log.Printf("Error sending datepicker: %v", err)
 		f.Reset(userID)
+		return
 	}
+	fsmutils.AppendMessageID(f, userID, msg.ID)
 }
 
 func (h *ScheduleHandler) PrepareTime(f *fsm.FSM, args ...any) {

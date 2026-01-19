@@ -30,19 +30,30 @@ func (d *Datepicker) OnDatepickerCancel(ctx context.Context, b *bot.Bot, callbac
 		return
 	}
 	d.f.Reset(userID)
+	_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+		ChatID:    callbackQuery.Message.Message.Chat.ID,
+		MessageID: callbackQuery.Message.Message.ID,
+	})
+	if err != nil {
+		log.Printf("failed to delete message onCancel: %e", err)
+	}
 }
 
 func (d *Datepicker) OnDatepickerSelect(ctx context.Context, b *bot.Bot, callbackQuery *models.CallbackQuery, date time.Time) {
-	id := callbackQuery.Message.Message.From.ID
 	userID := callbackQuery.From.ID
-	log.Printf("id (datepicker): %d", id)
-	log.Printf("UserId (datepicker): %d", userID)
 	currentState := d.f.Current(userID)
 	if currentState == stateDefault {
 		return
 	}
 	d.f.Set(userID, "date", date)
 	d.f.Transition(userID, stateTime, userID, ctx, b, callbackQuery)
+	_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+		ChatID:    callbackQuery.Message.Message.Chat.ID,
+		MessageID: callbackQuery.Message.Message.ID,
+	})
+	if err != nil {
+		log.Printf("failed to delete message onCancel: %e", err)
+	}
 }
 
 func ScheduleDatepicker(b *bot.Bot, d *Datepicker) {
@@ -58,6 +69,8 @@ func ScheduleDatepicker(b *bot.Bot, d *Datepicker) {
 		datepicker.OnCancel(d.OnDatepickerCancel),
 		datepicker.To(date.AddDate(0, 0, daysToAdd)),
 		datepicker.Language("ru"),
+		datepicker.NoDeleteAfterCancel(),
+		datepicker.NoDeleteAfterSelect(),
 		datepicker.WithPrefix("datepicker"),
 	}
 	d.Datepicker = datepicker.New(
@@ -76,6 +89,8 @@ func SessionDatepicker(b *bot.Bot, d *Datepicker) {
 		datepicker.From(date),
 		datepicker.OnCancel(d.OnDatepickerCancel),
 		datepicker.Language("ru"),
+		datepicker.NoDeleteAfterCancel(),
+		datepicker.NoDeleteAfterSelect(),
 		datepicker.WithPrefix("datepicker-session"),
 	}
 	d.Datepicker = datepicker.New(
